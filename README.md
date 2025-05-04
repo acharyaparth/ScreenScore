@@ -6,9 +6,8 @@
   <p><em>AI-powered screenplay analysis for film and TV producers</em></p>
 </div>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Discord](https://img.shields.io/discord/your-discord-server)](https://discord.gg/your-server)
 
 ScreenScore is an open-source tool that helps film and TV producers analyze screenplays for project greenlighting decisions. It runs entirely on your local machine, ensuring complete privacy for your screenplays.
 
@@ -38,7 +37,7 @@ ScreenScore is an open-source tool that helps film and TV producers analyze scre
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/screenscore.git
+   git clone https://github.com/acharyaparth/ScreenScore.git
    cd screenscore
    ```
 
@@ -74,7 +73,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
@@ -84,12 +83,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- [Discord Community](https://discord.gg/your-server)
-- [GitHub Issues](https://github.com/your-username/screenscore/issues)
-- [Documentation](docs/user-guide.md)
+- GitHub Issues: [https://github.com/acharyaparth/ScreenScore/issues](https://github.com/acharyaparth/ScreenScore/issues)
+- Community/Discord: Coming soon
+- Website: Coming soon
+- Twitter: Coming soon
 
 ## 🔗 Links
 
-- [Website](https://screenscore.ai)
-- [Blog](https://blog.screenscore.ai)
-- [Twitter](https://twitter.com/screenscore)
+- GitHub: [https://github.com/acharyaparth/ScreenScore](https://github.com/acharyaparth/ScreenScore)
