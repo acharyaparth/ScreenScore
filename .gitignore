@@ -22,3 +22,33 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables and secrets
+.env
+.env.*
+*.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Python virtual environment
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+build/
+out/
+
+# Coverage and test reports
+coverage/
+.coverage
+htmlcov/
+test-reports/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

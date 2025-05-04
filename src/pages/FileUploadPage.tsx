@@ -62,12 +62,12 @@ const FileUploadPage: React.FC = () => {
             <p className="text-gray-600">Analyzing your screenplay...</p>
           </div>
         ) : (
-          <FileUpload 
-            onUploadStart={() => setIsUploading(true)}
-            onUploadSuccess={handleUploadSuccess}
+      <FileUpload 
+        onUploadStart={() => setIsUploading(true)}
+        onUploadSuccess={handleUploadSuccess}
             onUploadError={handleUploadError}
-            isUploading={isUploading}
-          />
+        isUploading={isUploading}
+      />
         )}
       </Card>
 

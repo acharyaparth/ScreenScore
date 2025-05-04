@@ -131,7 +131,7 @@ app.post('/api/upload', upload.single('screenplay'), async (req, res) => {
 
     let text;
     try {
-      if (req.file.mimetype === 'application/pdf') {
+    if (req.file.mimetype === 'application/pdf') {
         logWithTime(`[${requestId}] Processing PDF file`, { path: req.file.path });
         
         const scriptPath = path.join(__dirname, 'extract_text.py');
@@ -191,10 +191,10 @@ app.post('/api/upload', upload.single('screenplay'), async (req, res) => {
           });
 
           processAnalysis();
-        });
-      } else {
+      });
+    } else {
         logWithTime(`[${requestId}] Processing text file`, { path: req.file.path });
-        text = fs.readFileSync(req.file.path, 'utf-8');
+      text = fs.readFileSync(req.file.path, 'utf-8');
         logWithTime(`[${requestId}] Text file read successfully`, { 
           length: text.length,
           preview: text.substring(0, 100)
@@ -217,10 +217,10 @@ app.post('/api/upload', upload.single('screenplay'), async (req, res) => {
     async function processAnalysis() {
       try {
         logWithTime(`[${requestId}] Starting screenplay analysis`);
-        const analysis = await analyzeScreenplay(text, (status) => {
+    const analysis = await analyzeScreenplay(text, (status) => {
           logWithTime(`[${requestId}] Analysis status update`, { status });
-          progressMap.set(analysisId, { status });
-        });
+      progressMap.set(analysisId, { status });
+    });
 
         const endTime = Date.now();
         logWithTime(`[${requestId}] Analysis complete`, { 
@@ -229,14 +229,14 @@ app.post('/api/upload', upload.single('screenplay'), async (req, res) => {
         });
         
         cleanupFile(req.file.path);
-        progressMap.delete(analysisId);
+    progressMap.delete(analysisId);
         // Store the completed analysis
         analysisResults.set(analysisId, analysis);
         logMemoryUsage();
-        
-        return res.status(200).json({
-          success: true,
-          message: 'Analysis complete',
+
+    return res.status(200).json({
+      success: true,
+      message: 'Analysis complete',
           analysis,
           analysisId,
           requestId
