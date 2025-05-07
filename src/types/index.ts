@@ -4,6 +4,10 @@ export interface GenreAnalysis {
   subGenres?: string[];
   genreConfidence: Record<string, number>;
   genreInsights: string;
+  originalityScore?: number;
+  socialCommentary?: string;
+  narrativeEngagement?: string;
+  keyOriginalElements?: string[];
 }
 
 // Tone & Themes Analysis Types
@@ -17,6 +21,10 @@ export interface ToneThemesAnalysis {
 export interface CharacterArc {
   character: string;
   arc: string;
+  relatabilityScore?: number;
+  emotionalInvestmentScore?: number;
+  arcCompleteness?: string;
+  notableDialogue?: string[];
 }
 
 export interface GenderBreakdown {
@@ -49,6 +57,9 @@ export interface ProductionAnalysis {
   largeSetPieces: number;
   specialRequirements: string[];
   notableSetPieces: string[];
+  budgetEstimateBracket?: 'Low' | 'Medium' | 'High';
+  highRiskElements?: string[];
+  productionFeasibilityScore?: number;
 }
 
 // Audience Analysis Types

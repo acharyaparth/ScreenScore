@@ -42,7 +42,11 @@ Please provide a detailed analysis in JSON format with the following structure. 
   "keyElements": ["string (specific scenes, dialogue, or plot points that define the genre)"],
   "reasoning": "string (detailed explanation of genre classification, including tone, themes, and narrative structure)",
   "subgenre": "string (if applicable, e.g., 'Psychological Thriller', 'Romantic Comedy')",
-  "genreConventions": ["string (how the screenplay follows or subverts genre conventions)"]
+  "genreConventions": ["string (how the screenplay follows or subverts genre conventions)"],
+  "originalityScore": "number (0-1, how fresh/unique is the concept)",
+  "socialCommentary": "string (does the script address social issues? How?)",
+  "narrativeEngagement": "string (is the story compelling? Where does it drag or shine?)",
+  "keyOriginalElements": ["string (concrete examples of originality or twist)"]
 }`,
     tone: `{
   "overallTone": "string (the dominant emotional quality of the screenplay)",
@@ -62,7 +66,11 @@ Please provide a detailed analysis in JSON format with the following structure. 
     "significance": "string (importance to the story)",
     "motivations": ["string (key driving forces)"],
     "conflicts": ["string (internal and external conflicts)"],
-    "relationships": ["string (key relationships with other characters)"]
+    "relationships": ["string (key relationships with other characters)"],
+    "relatabilityScore": "number (0-1, how relatable is the character)",
+    "emotionalInvestmentScore": "number (0-1, how much does the script make the audience care)",
+    "arcCompleteness": "string (is the arc earned and satisfying?)",
+    "notableDialogue": ["string (1-2 lines that exemplify character strengths/weaknesses)"]
   }],
   "supportingCharacters": [{
     "name": "string",
@@ -82,7 +90,10 @@ Please provide a detailed analysis in JSON format with the following structure. 
   "budgetConsiderations": ["string (cost implications of various elements)"],
   "technicalRequirements": ["string (specialized equipment or expertise needed)"],
   "productionChallenges": ["string (potential difficulties in production)"],
-  "resourceNeeds": ["string (crew, equipment, and other resources required)"]
+  "resourceNeeds": ["string (crew, equipment, and other resources required)"],
+  "budgetEstimateBracket": "string (Low, Medium, High)",
+  "highRiskElements": ["string (scenes or requirements that are costly or risky)"],
+  "productionFeasibilityScore": "number (0-1, how realistic is the script to produce)"
 }`,
     audience: `{
   "targetDemographic": "string (primary and secondary audience groups)",
