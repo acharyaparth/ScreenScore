@@ -1,5 +1,7 @@
 # ScreenScore API Documentation
 
+> **License & Privacy:** ScreenScore is GPLv3-licensed, privacy-first, and all analysis is performed locally—no data leaves your machine.
+
 This document provides details about the ScreenScore API endpoints, request/response formats, and usage examples.
 
 ## Base URL

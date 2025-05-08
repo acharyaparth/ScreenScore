@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users, UserCircle, Meh, UserCheck } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, Text } from 'recharts';
 import { CharacterAnalysis } from '../../types';
 
 interface CharacterSectionProps {
@@ -17,12 +17,43 @@ const CharacterSection: React.FC<CharacterSectionProps> = ({ data }) => {
 
   const COLORS = ['#0284c7', '#14b8a6', '#f59e0b', '#ef4444'];
   
+  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }: {
+    cx: number;
+    cy: number;
+    midAngle: number;
+    innerRadius: number;
+    outerRadius: number;
+    percent: number;
+    index: number;
+    name: string;
+  }) => {
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.7;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    return (
+      <text
+        x={x}
+        y={y}
+        fill="#fff"
+        textAnchor={x > cx ? 'start' : 'end'}
+        dominantBaseline="central"
+        fontSize={13}
+        fontWeight={500}
+        style={{ pointerEvents: 'none' }}
+      >
+        {`${name}: ${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+
   return (
     <div className="report-section">
       <div className="flex items-center mb-6">
         <Users className="w-5 h-5 text-accent-400 mr-2" />
         <h2 className="text-xl font-bold text-white">Character Analysis</h2>
       </div>
+      <p className="text-gray-400 mb-6">A strong cast of characters is essential for compelling storytelling. This section breaks down your script's character diversity, gender balance, and the depth of main character arcs—key factors for both creative and commercial success.</p>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div>
@@ -79,7 +110,7 @@ const CharacterSection: React.FC<CharacterSectionProps> = ({ data }) => {
                   fill="#8884d8"
                   paddingAngle={5}
                   dataKey="value"
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={renderCustomLabel}
                 >
                   {genderData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -90,7 +121,7 @@ const CharacterSection: React.FC<CharacterSectionProps> = ({ data }) => {
                   contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '0.375rem' }}
                   labelStyle={{ color: 'white' }}
                 />
-                <Legend />
+                <Legend layout="horizontal" align="center" verticalAlign="bottom" iconType="circle" wrapperStyle={{ marginTop: 10 }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -100,7 +131,26 @@ const CharacterSection: React.FC<CharacterSectionProps> = ({ data }) => {
             {data.characterArcs.map((arc, index) => (
               <div key={index} className="mb-4 p-3 bg-gray-700/30 rounded-md">
                 <p className="font-medium text-white mb-1">{arc.character}</p>
-                <p className="text-gray-400 text-sm">{arc.arc}</p>
+                <p className="text-gray-400 text-sm mb-1">{arc.arc}</p>
+                {typeof arc.relatabilityScore === 'number' && (
+                  <p className="text-gray-300 text-xs mb-1">Relatability Score: {(arc.relatabilityScore * 100).toFixed(0)} / 100</p>
+                )}
+                {typeof arc.emotionalInvestmentScore === 'number' && (
+                  <p className="text-gray-300 text-xs mb-1">Emotional Investment: {(arc.emotionalInvestmentScore * 100).toFixed(0)} / 100</p>
+                )}
+                {arc.arcCompleteness && (
+                  <p className="text-gray-300 text-xs mb-1">Arc Completeness: {arc.arcCompleteness}</p>
+                )}
+                {arc.notableDialogue && arc.notableDialogue.length > 0 && (
+                  <div className="mt-1">
+                    <p className="text-gray-300 text-xs font-semibold">Notable Dialogue:</p>
+                    <ul className="list-disc list-inside text-gray-300 text-xs">
+                      {arc.notableDialogue.map((line, i) => (
+                        <li key={i}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             ))}
           </div>

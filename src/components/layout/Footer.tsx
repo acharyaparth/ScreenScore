@@ -26,18 +26,14 @@ const Footer: React.FC = () => {
         
         <div className="text-center">
           <p className="text-gray-400 mb-4">
-            ScreenScore is an open-source screenplay analysis tool that runs entirely on your local machine.
-            No data leaves your computer, ensuring complete privacy for your screenplays.
+            ScreenScore is an open-source screenplay analysis tool that runs entirely on your local machine, ensuring your creative work stays private.
           </p>
-          
           <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-500">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Use</a>
-            <a href="#" className="hover:text-white transition-colors">License</a>
+            <a href="https://github.com/acharyaparth/ScreenScore" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
+            <a href="/LICENSE" className="hover:text-white transition-colors">License (GPLv3)</a>
           </div>
-          
           <p className="mt-6 text-gray-500">
-            © {new Date().getFullYear()} ScreenScore. Released under the MIT License.
+            © {new Date().getFullYear()} ScreenScore. All analysis is performed locally—your data never leaves your device.
           </p>
         </div>
       </div>

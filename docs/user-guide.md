@@ -1,5 +1,7 @@
 # ScreenScore User Guide
 
+> **License & Privacy:** ScreenScore is GPLv3-licensed, privacy-first, and all analysis is performed locally—no data leaves your machine.
+
 Welcome to ScreenScore! This guide will help you get started with using our screenplay analysis tool.
 
 ## Table of Contents

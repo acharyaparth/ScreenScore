@@ -1,5 +1,7 @@
 # ScreenScore Troubleshooting Guide
 
+> **License & Privacy:** ScreenScore is GPLv3-licensed, privacy-first, and all analysis is performed locally—no data leaves your machine.
+
 This guide provides solutions for common issues you might encounter while using ScreenScore.
 
 ## Table of Contents

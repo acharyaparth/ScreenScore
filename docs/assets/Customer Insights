@@ -1,0 +1,71 @@
+## Story and Concept
+Originality and Uniqueness: The script should offer a fresh perspective or a unique twist on familiar themes. "The script was pitched as a show 'about how comedians get their material.'" https://www.reddit.com/r/todayilearned/comments/k9p41t/comment/gf5n7zp/
+Compelling Narrative: The story must be engaging and have a clear narrative arc. "The pacing was literal torture and the film lacked any self-awareness." https://www.reddit.com/r/Letterboxd/comments/1ft2ddh/the_substance_is_a_terrible_film/
+Social Commentary: Scripts that touch on relevant social issues or offer insightful commentary are often favored. "Heavy handed? Preachy? That's literally every one of his movies." https://www.reddit.com/r/movies/comments/1iq74ir/comment/mczl377/
+
+## Character Development
+Relatable and Believable Characters: The characters should be well-developed and relatable to the audience. "People say the actress is great, but please watch the scene where she is talking to that one guy she knows from school that she later asks on a date. The acting is awful." https://www.reddit.com/r/Letterboxd/comments/1ft2ddh/comment/lpw9mxb/
+Character Arcs: Characters should undergo significant development or transformation throughout the story. "Mickey 17 is funny and charming from the get-go, building out a fascinating sci-fi world from its central conceit." https://www.reddit.com/r/movies/comments/1iq74ir/bong_joonhos_mickey_17_review_thread/
+
+## Marketability and Audience Appeal
+Target Audience: Understanding the potential audience and ensuring the script appeals to them is crucial. "It is appealing to mainstream public and bombastic, entertaining and, a bad movie." https://www.reddit.com/r/Letterboxd/comments/1ft2ddh/comment/lr807sp/
+Genre and Trends: Keeping up with current trends and understanding the marketability of the genre is important. "I'm seeing this to support Bong and enjoy 17 Robert Pattinsons regardless of reviews." https://www.reddit.com/r/movies/comments/1iq74ir/comment/mcxqhqf/
+
+## Production Viability
+Budget and Resources: The script should be realistic in terms of production costs and resource requirements. "My advice is either have money or make friends with people that have money." https://www.reddit.com/r/FilmIndustryLA/comments/155v445/comment/jsxanvz/
+Location and Logistics: Considering the feasibility of shooting locations and logistical challenges is essential. "Texas has Everything! - The Pitch." https://www.reddit.com/r/movies/comments/1iifvmi/comment/mb54goy/
+
+## Creative Team
+Director and Cast: The involvement of a strong director and cast can significantly influence the decision. "While a game-for-anything dual-role performance from Robert Pattinson keeps the English-language feature entertaining enough." https://www.reddit.com/r/movies/comments/1iq74ir/bong_joonhos_mickey_17_review_thread/
+Writer and Producer: The credibility and past success of the writer and producer are important. "I know a handful of Stark grads. I'd probably say the networking/internship placement is better than any other program that I know of." https://www.reddit.com/r/FilmIndustryLA/comments/155v445/comment/jswamre/
+
+## Potential for Impact
+Cultural and Social Impact: Scripts that have the potential to spark conversations or create a lasting impact are often favored. "The movie makes NO SENSE. How is she famous, how does she get paid, how does she have a bank account or ID?" https://www.reddit.com/r/Letterboxd/comments/1ft2ddh/comment/lpw9mxb/
+Critical Acclaim: The potential for critical acclaim and awards can also be a factor. "Tom Cruise was nominated for a Golden Globe as best supporting actor." https://www.reddit.com/r/todayilearned/comments/95tc7f/comment/e3vd8su/
+
+{
+  "primaryGenre": "...",
+  "secondaryGenres": ["..."],
+  "confidence": 0.9,
+  "keyElements": ["..."],
+  "reasoning": "...",
+  "subgenre": "...",
+  "genreConventions": ["..."],
+  "originalityScore": 0.8,
+  "socialCommentary": "Addresses class divide through protagonist's journey.",
+  "narrativeEngagement": "Strong first act, pacing slows in second act.",
+  "keyOriginalElements": ["Nonlinear timeline", "Meta-narrative device"]
+}
+
+{
+  "mainCharacters": [
+    {
+      "name": "...",
+      "role": "...",
+      "arc": "...",
+      "significance": "...",
+      "motivations": ["..."],
+      "conflicts": ["..."],
+      "relationships": ["..."],
+      "relatabilityScore": 0.7,
+      "emotionalInvestmentScore": 0.9,
+      "arcCompleteness": "Fully realized arc with satisfying resolution.",
+      "notableDialogue": ["'I never wanted this life.'"]
+    }
+  ],
+  ...
+}
+
+{
+  "locations": ["..."],
+  "specialEffects": ["..."],
+  "stunts": ["..."],
+  "setPieces": ["..."],
+  "budgetConsiderations": ["..."],
+  "technicalRequirements": ["..."],
+  "productionChallenges": ["..."],
+  "resourceNeeds": ["..."],
+  "budgetEstimateBracket": "High",
+  "highRiskElements": ["Underwater sequence", "Large crowd scenes"],
+  "productionFeasibilityScore": 0.6
+}

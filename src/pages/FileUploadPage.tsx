@@ -21,19 +21,19 @@ const FileUploadPage: React.FC = () => {
 
   const features = [
     {
-      icon: <FileText className="w-8 h-8 text-primary-400" />,
-      title: 'Genre Detection',
-      description: 'Identify the most likely genre based on language, tone, and scene content.'
+      icon: <FileText className="w-8 h-8 text-accent-400" />,
+      title: 'Local, Private AI',
+      description: 'All analysis is performed by a powerful AI model running entirely on your device. Your screenplay never leaves your computer.'
     },
     {
       icon: <Film className="w-8 h-8 text-primary-400" />,
-      title: 'Character Analysis',
-      description: 'Count speaking roles, estimate diversity, and highlight character arcs.'
+      title: 'Comprehensive Story Insights',
+      description: 'Get deep analysis of genre, tone, character arcs, and narrative structure—tailored for film and TV professionals.'
     },
     {
-      icon: <Clapperboard className="w-8 h-8 text-primary-400" />,
-      title: 'Production Complexity',
-      description: 'Analyze locations, VFX needs, stunts, and set pieces required.'
+      icon: <Clapperboard className="w-8 h-8 text-secondary-400" />,
+      title: 'Production & Market Readiness',
+      description: 'Assess production complexity, budget range, and audience fit with actionable, industry-focused reporting.'
     }
   ];
 
@@ -76,8 +76,8 @@ const FileUploadPage: React.FC = () => {
       </div>
 
       <FeatureList 
-        title="Analyze Your Screenplay for Success" 
-        subtitle="Get insights that help make informed greenlighting decisions"
+        title="Analyze for Success—With Complete Privacy" 
+        subtitle="ScreenScore runs 100% locally, using open-source AI. Your data stays private, and your creative work never leaves your machine."
         features={features}
       />
     </div>

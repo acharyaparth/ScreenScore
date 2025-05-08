@@ -158,6 +158,11 @@ const AnalysisPage: React.FC = () => {
     )
   });
 
+  const missingNewFields =
+    !analysis.genre?.originalityScore ||
+    !analysis.characters?.characterArcs?.some(arc => arc.relatabilityScore) ||
+    !analysis.production?.budgetEstimateBracket;
+
   return (
     <div className="animate-fade-in">
       {validationWarnings.length > 0 && (
@@ -174,6 +179,10 @@ const AnalysisPage: React.FC = () => {
             </div>
           </div>
         </Card>
+      )}
+
+      {missingNewFields && (
+        <Alert type="warning" className="mb-4" message="Some advanced analysis fields are missing. This may be due to incomplete LLM output or a fallback template being used. Try re-running the analysis or check your LLM configuration." />
       )}
 
       <div className="flex justify-between items-center mb-8">

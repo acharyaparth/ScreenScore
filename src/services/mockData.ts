@@ -1,6 +1,8 @@
 import { ScreenplayAnalysis } from '../types';
 
 export const mockAnalysisData: ScreenplayAnalysis = {
+  id: 'mock-001',
+  timestamp: new Date().toISOString(),
   title: "The Last Sunset",
   author: "Jane Doe",
   
@@ -14,7 +16,15 @@ export const mockAnalysisData: ScreenplayAnalysis = {
       "Crime": 0.42,
       "Action": 0.35
     },
-    genreInsights: "This screenplay blends elements of psychological thriller with mystery, featuring a strong investigative narrative with emotional character arcs that add dramatic weight."
+    genreInsights: "This screenplay blends elements of psychological thriller with mystery, featuring a strong investigative narrative with emotional character arcs that add dramatic weight.",
+    originalityScore: 0.85,
+    socialCommentary: "Explores the impact of trauma and justice on small-town communities, touching on issues of gender and power.",
+    narrativeEngagement: "The story is gripping with a strong first act and a twist in the second act that keeps the audience engaged. Some pacing issues in the third act.",
+    keyOriginalElements: [
+      "Nonlinear flashback structure",
+      "Female detective protagonist",
+      "Storm-lighthouse set piece"
+    ]
   },
   
   toneThemes: {
@@ -42,15 +52,36 @@ export const mockAnalysisData: ScreenplayAnalysis = {
     characterArcs: [
       {
         character: "Detective Sarah Reeves",
-        arc: "From emotionally detached investigator to confronting her own past trauma"
+        arc: "From emotionally detached investigator to confronting her own past trauma",
+        relatabilityScore: 0.8,
+        emotionalInvestmentScore: 0.9,
+        arcCompleteness: "Fully realized arc with a cathartic resolution.",
+        notableDialogue: [
+          "I can't run from my past forever.",
+          "Justice isn't always black and white."
+        ]
       },
       {
         character: "Michael Thorne",
-        arc: "From suspected perpetrator to complex ally revealing hidden depths"
+        arc: "From suspected perpetrator to complex ally revealing hidden depths",
+        relatabilityScore: 0.6,
+        emotionalInvestmentScore: 0.7,
+        arcCompleteness: "Arc is satisfying but could use more backstory.",
+        notableDialogue: [
+          "You don't know what I'm capable of.",
+          "Sometimes the truth is the most dangerous thing."
+        ]
       },
       {
         character: "Elena Cortez",
-        arc: "From victim's sister seeking justice to questioning her own motives and ethics"
+        arc: "From victim's sister seeking justice to questioning her own motives and ethics",
+        relatabilityScore: 0.7,
+        emotionalInvestmentScore: 0.8,
+        arcCompleteness: "Strong arc with a morally ambiguous ending.",
+        notableDialogue: [
+          "I thought I wanted justice, but now I'm not sure.",
+          "What if I'm no better than the person I'm chasing?"
+        ]
       }
     ]
   },
@@ -72,7 +103,14 @@ export const mockAnalysisData: ScreenplayAnalysis = {
     notableSetPieces: [
       "Climactic confrontation at lighthouse during a storm",
       "Flashback sequence requiring period-accurate 1990s small town setting"
-    ]
+    ],
+    budgetEstimateBracket: 'High',
+    highRiskElements: [
+      "Underwater filming",
+      "Storm effects at lighthouse",
+      "Large crowd scene in town square"
+    ],
+    productionFeasibilityScore: 0.65
   },
   
   audience: {

@@ -1,5 +1,7 @@
 # ScreenScore - Screenplay Analysis Tool
 
+> **License:** ScreenScore is licensed under the GPLv3. All analysis is performed locally on your machine—your data never leaves your computer. 100% privacy-first, open-source, and free to use.
+
 <div align="center">
   <img src="docs/assets/logo.png" alt="ScreenScore Logo" width="200"/>
   <br/>

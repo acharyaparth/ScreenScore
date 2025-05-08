@@ -36,17 +36,17 @@ const Navbar: React.FC = () => {
           </Link>
           
           <div className="hidden md:flex space-x-6 items-center">
-            <Link to="/" className="text-gray-300 hover:text-white transition-colors">
+            <Link to="/" className="text-gray-300 hover:text-accent-400 transition-colors">
               Home
             </Link>
-            <a href="#how-it-works" className="text-gray-300 hover:text-white transition-colors">
+            <a href="#how-it-works" className="text-gray-300 hover:text-accent-400 transition-colors">
               How It Works
             </a>
             <a 
-              href="https://github.com/your-username/screenscore"
+              href="https://github.com/acharyaparth/ScreenScore"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn-accent"
+              className="btn btn-accent shadow-none border border-accent-400 hover:bg-accent-400/80 hover:text-cinema-dark transition-colors"
             >
               View on GitHub
             </a>
@@ -76,7 +76,7 @@ const Navbar: React.FC = () => {
               How It Works
             </a>
             <a 
-              href="https://github.com/your-username/screenscore"
+              href="https://github.com/acharyaparth/ScreenScore"
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-accent w-full"

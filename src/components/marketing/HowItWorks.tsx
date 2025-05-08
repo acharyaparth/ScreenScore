@@ -5,22 +5,22 @@ const steps = [
   {
     icon: <Upload className="w-8 h-8 text-primary-400" />,
     title: "Upload Screenplay",
-    description: "Upload your screenplay in PDF or TXT format. Maximum file size is 10MB."
+    description: "Select your screenplay (PDF or TXT, up to 10MB). All files are processed locally—never uploaded to the cloud."
   },
   {
     icon: <Brain className="w-8 h-8 text-primary-400" />,
-    title: "AI Analysis",
-    description: "Our local AI model analyzes your screenplay for genre, tone, characters, and production requirements."
+    title: "Local AI Analysis",
+    description: "ScreenScore uses a powerful local AI model (Mistral via Ollama) to analyze your script for genre, tone, characters, and production needs—entirely on your device."
   },
   {
     icon: <FileText className="w-8 h-8 text-primary-400" />,
-    title: "Detailed Report",
-    description: "Receive a comprehensive analysis report with insights for greenlighting decisions."
+    title: "Comprehensive Report",
+    description: "Receive a detailed, structured report with actionable insights for greenlighting and development. No data ever leaves your machine."
   },
   {
     icon: <CheckCircle className="w-8 h-8 text-primary-400" />,
-    title: "Make Decisions",
-    description: "Use the generated insights to evaluate production potential and requirements."
+    title: "Confident Decisions",
+    description: "Use the privacy-first analysis to evaluate creative and production potential, with full control over your data."
   }
 ];
 

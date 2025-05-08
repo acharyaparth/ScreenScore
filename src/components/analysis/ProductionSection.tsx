@@ -20,6 +20,7 @@ const ProductionSection: React.FC<ProductionSectionProps> = ({ data }) => {
         <Clapperboard className="w-5 h-5 text-accent-400 mr-2" />
         <h2 className="text-xl font-bold text-white">Production Complexity</h2>
       </div>
+      <p className="text-gray-400 mb-6">Production analysis highlights the logistical and financial demands of your screenplay. This section covers locations, VFX, stunts, set pieces, and budget range—helping you anticipate challenges and plan for a successful shoot.</p>
       
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
@@ -114,6 +115,29 @@ const ProductionSection: React.FC<ProductionSectionProps> = ({ data }) => {
           </div>
         )}
       </div>
+      
+      {data.budgetEstimateBracket && (
+        <div className="mt-4">
+          <h4 className="text-md font-semibold text-accent-400 mb-1">Budget Estimate Bracket</h4>
+          <p className="text-gray-300">{data.budgetEstimateBracket}</p>
+        </div>
+      )}
+      {data.highRiskElements && data.highRiskElements.length > 0 && (
+        <div className="mt-2">
+          <h4 className="text-md font-semibold text-accent-400 mb-1">High-Risk Elements</h4>
+          <ul className="list-disc list-inside text-gray-300">
+            {data.highRiskElements.map((el, i) => (
+              <li key={i}>{el}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {typeof data.productionFeasibilityScore === 'number' && (
+        <div className="mt-2">
+          <h4 className="text-md font-semibold text-accent-400 mb-1">Production Feasibility Score</h4>
+          <p className="text-gray-300">{(data.productionFeasibilityScore * 100).toFixed(0)} / 100</p>
+        </div>
+      )}
     </div>
   );
 };

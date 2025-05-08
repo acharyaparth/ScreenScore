@@ -76,7 +76,15 @@ const defaultAnalysis = {
       "Thriller": 0.6,
       "Mystery": 0.5
     },
-    genreInsights: "This screenplay primarily follows dramatic storytelling conventions with elements of thriller and mystery."
+    genreInsights: "This screenplay primarily follows dramatic storytelling conventions with elements of thriller and mystery.",
+    originalityScore: 0.85,
+    socialCommentary: "Explores the impact of trauma and justice on small-town communities, touching on issues of gender and power.",
+    narrativeEngagement: "The story is gripping with a strong first act and a twist in the second act that keeps the audience engaged. Some pacing issues in the third act.",
+    keyOriginalElements: [
+      "Nonlinear flashback structure",
+      "Female detective protagonist",
+      "Storm-lighthouse set piece"
+    ]
   },
   toneThemes: {
     emotionalTones: ["Serious", "Tense", "Reflective"],
@@ -97,11 +105,25 @@ const defaultAnalysis = {
     characterArcs: [
       {
         character: "Main Character",
-        arc: "Journey of self-discovery and redemption"
+        arc: "Journey of self-discovery and redemption",
+        relatabilityScore: 0.8,
+        emotionalInvestmentScore: 0.9,
+        arcCompleteness: "Fully realized arc with a cathartic resolution.",
+        notableDialogue: [
+          "I can't run from my past forever.",
+          "Justice isn't always black and white."
+        ]
       },
       {
         character: "Supporting Character",
-        arc: "Learning to trust and support others"
+        arc: "Learning to trust and support others",
+        relatabilityScore: 0.7,
+        emotionalInvestmentScore: 0.8,
+        arcCompleteness: "Strong arc with a morally ambiguous ending.",
+        notableDialogue: [
+          "I thought I wanted justice, but now I'm not sure.",
+          "What if I'm no better than the person I'm chasing?"
+        ]
       }
     ]
   },
@@ -115,7 +137,14 @@ const defaultAnalysis = {
     stuntScenes: 2,
     largeSetPieces: 1,
     specialRequirements: ["Night scenes", "Rain sequence"],
-    notableSetPieces: ["Climactic confrontation"]
+    notableSetPieces: ["Climactic confrontation"],
+    budgetEstimateBracket: 'High',
+    highRiskElements: [
+      "Underwater filming",
+      "Storm effects at lighthouse",
+      "Large crowd scene in town square"
+    ],
+    productionFeasibilityScore: 0.65
   },
   audience: {
     contentRating: "PG-13",
@@ -289,29 +318,18 @@ export const analyzeScreenplay = async (text, progressCallback) => {
         responsePreview: analysisText.substring(0, 500)
       });
       
-      // Try to extract JSON from the response if it's wrapped in markdown or other text
-      const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
+      // Try to extract the largest JSON block
+      const match = analysisText.match(/\{[\s\S]*\}/);
+      if (match) {
         try {
-          console.log('Attempting to extract JSON from response...');
-          const extractedJson = JSON.parse(jsonMatch[0]);
-          
-          // Validate extracted JSON
-          const requiredFields = ['genre', 'toneThemes', 'characters', 'production', 'audience', 'greenlight'];
-          const missingFields = requiredFields.filter(field => !extractedJson[field]);
-          
-          if (missingFields.length === 0) {
-            console.log('Successfully extracted and validated JSON');
-            return extractedJson;
-          } else {
-            console.error('Extracted JSON missing required fields:', missingFields);
-            console.log('Using default analysis template');
-            return defaultAnalysis;
-          }
+          const extracted = match[0];
+          const analysis = JSON.parse(extracted);
+          console.log('Successfully parsed extracted JSON block');
+          return analysis;
         } catch (extractError) {
           console.error('Failed to parse extracted JSON:', {
             error: extractError.message,
-            extractedText: jsonMatch[0].substring(0, 500)
+            extractedText: match[0].substring(0, 500)
           });
           console.log('Using default analysis template');
           return defaultAnalysis;

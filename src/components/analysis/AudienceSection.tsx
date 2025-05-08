@@ -13,6 +13,7 @@ const AudienceSection: React.FC<AudienceSectionProps> = ({ data }) => {
         <Users className="w-5 h-5 text-accent-400 mr-2" />
         <h2 className="text-xl font-bold text-white">Audience Fit</h2>
       </div>
+      <p className="text-gray-400 mb-6">Understanding your target audience is crucial for market success. This section estimates the likely rating, target demographics, and content warnings—helping you position your project for the right viewers and distribution channels.</p>
       
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-gray-200 mb-2">Suggested Rating</h3>
@@ -21,6 +22,7 @@ const AudienceSection: React.FC<AudienceSectionProps> = ({ data }) => {
           <div className="flex items-center">
             <div className={`
               w-12 h-12 flex items-center justify-center rounded-md font-bold text-lg mr-3
+              whitespace-nowrap
               ${getRatingColor(data.contentRating)}
             `}>
               {data.contentRating}

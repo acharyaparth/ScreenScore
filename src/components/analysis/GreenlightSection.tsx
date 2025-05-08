@@ -16,6 +16,7 @@ const GreenlightSection: React.FC<GreenlightSectionProps> = ({ data }) => {
   return (
     <div className="report-section">
       <h2 className="text-xl font-bold text-white mb-6">Greenlight Assessment</h2>
+      <p className="text-gray-400 mb-6">The Greenlight Assessment brings together all aspects of your screenplay—story, characters, production, and audience—to provide a clear, actionable recommendation. Use this section to guide your next steps, whether it's moving forward, revising, or seeking further feedback.</p>
       
       <div className="mb-8">
         <div className={`

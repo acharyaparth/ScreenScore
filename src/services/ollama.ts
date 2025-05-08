@@ -30,7 +30,9 @@ const generatePrompt = ({ screenplay, analysisType }: AnalysisPrompt): string =>
 
 ${screenplay}
 
-Please provide a detailed analysis in JSON format with the following structure. Be specific and provide concrete examples from the text where possible. Use industry-standard terminology and consider both commercial and artistic aspects:
+Please provide a detailed analysis in JSON format with the following structure. Be specific and provide concrete examples from the text where possible. Use industry-standard terminology and consider both commercial and artistic aspects.
+
+Respond ONLY with valid JSON matching the schema below. Do not include any extra commentary or explanation. Do not add any keys not present in the schema.
 
 `;
 
@@ -150,7 +152,7 @@ class OllamaService {
         return cached;
       }
 
-      const analysisTypes: Array<keyof typeof generatePrompt> = [
+      const analysisTypes: Array<'genre' | 'tone' | 'characters' | 'production' | 'audience' | 'greenlight'> = [
         'genre',
         'tone',
         'characters',

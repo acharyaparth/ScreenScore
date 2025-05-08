@@ -1,5 +1,7 @@
 # Contributing to ScreenScore
 
+> **License & Privacy:** ScreenScore is GPLv3-licensed and privacy-first. All analysis is performed locally—no data leaves your machine.
+
 Thank you for your interest in contributing to ScreenScore! This document provides guidelines and instructions for contributing to the project.
 
 ## Code of Conduct

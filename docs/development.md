@@ -1,5 +1,7 @@
 # ScreenScore Development Guide
 
+> **License & Privacy:** ScreenScore is GPLv3-licensed, privacy-first, and all analysis is performed locally—no data leaves your machine.
+
 This guide provides information for developers who want to contribute to or modify ScreenScore.
 
 ## Table of Contents
