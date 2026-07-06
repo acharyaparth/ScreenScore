@@ -2,29 +2,13 @@
 
 import pytest
 
-from screenscore.pipeline.stub import build_stub_report
 from screenscore.schemas import ReportValidationError, validate_report
 
-
-def make_report(**overrides):
-    report = build_stub_report(
-        report_id="r1",
-        draft_id="d1",
-        script_hash="abc123",
-        title="Test Script",
-        source_format="fountain",
-        draft_label=None,
-    )
-    report.update(overrides)
-    return report
+from report_fixture import make_report
 
 
-def test_stub_report_is_schema_valid():
+def test_fixture_report_is_schema_valid():
     validate_report(make_report())
-
-
-def test_stub_reports_are_marked_stub():
-    assert make_report()["meta"]["stub"] is True
 
 
 def test_scored_dimension_requires_evidence():

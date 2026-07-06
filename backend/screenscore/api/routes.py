@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from .. import ENGINE_VERSION, config, hardware
 from ..db import repository
 from ..parsing import PARSER_VERSION, parse_bytes
-from ..pipeline import stub
+from ..pipeline import prompts, stages
 
 router = APIRouter()
 
@@ -102,6 +102,8 @@ async def analyze(
     file: UploadFile,
     project_id: str | None = Form(default=None),
     draft_label: str | None = Form(default=None),
+    worker_model: str | None = Form(default=None),
+    reasoning_model: str | None = Form(default=None),
 ):
     conn = request.app.state.conn
     bus = request.app.state.bus
@@ -156,15 +158,22 @@ async def analyze(
             label=draft_label,
         )
 
+    if not worker_model or not reasoning_model:
+        recommendation = hardware.recommend(hardware.detect())
+        worker_model = worker_model or recommendation.worker_model
+        reasoning_model = reasoning_model or recommendation.reasoning_model
+
     report = repository.create_report(
         conn,
         draft_id=draft["id"],
         schema_version=config.REPORT_SCHEMA_VERSION,
-        prompt_version=config.PROMPT_VERSION,
-        worker_model=None,
-        reasoning_model=None,
+        prompt_version=prompts.PROMPT_VERSION,
+        worker_model=worker_model,
+        reasoning_model=reasoning_model,
     )
-    asyncio.create_task(stub.run(report["id"], conn, bus))
+    asyncio.create_task(
+        stages.run_pipeline(report["id"], conn, bus, request.app.state.runtime)
+    )
     return {
         "project_id": project["id"],
         "draft_id": draft["id"],
@@ -226,6 +235,32 @@ async def report_events(request: Request, report_id: str):
             return
         async for event in bus.stream(report_id):
             yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# -- models -------------------------------------------------------------------
+
+class PullRequest(BaseModel):
+    model: str
+
+
+@router.post("/models/pull")
+async def pull_model(request: Request, body: PullRequest):
+    """User-initiated model download — the one permitted outbound activity."""
+    runtime = request.app.state.runtime
+
+    async def gen():
+        try:
+            async for event in runtime.pull(body.model):
+                yield f"data: {json.dumps(event)}\n\n"
+            yield f'data: {json.dumps({"status": "done", "model": body.model})}\n\n'
+        except Exception as exc:
+            yield f'data: {json.dumps({"status": "error", "error": str(exc)})}\n\n'
 
     return StreamingResponse(
         gen(),

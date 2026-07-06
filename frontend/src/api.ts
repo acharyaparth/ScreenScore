@@ -36,4 +36,26 @@ export const api = {
   progressEvents(reportId: string): EventSource {
     return new EventSource(`/api/reports/${reportId}/events`)
   },
+
+  async pullModel(model: string, onEvent: (e: Record<string, unknown>) => void): Promise<void> {
+    const resp = await fetch('/api/models/pull', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model }),
+    })
+    if (!resp.ok || !resp.body) throw new Error(`pull failed (${resp.status})`)
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop() ?? ''
+      for (const part of parts) {
+        if (part.startsWith('data: ')) onEvent(JSON.parse(part.slice(6)))
+      }
+    }
+  },
 }
