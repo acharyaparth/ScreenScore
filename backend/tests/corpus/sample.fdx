@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<FinalDraft DocumentType="Script" Template="No" Version="5">
+  <Content>
+    <Paragraph Type="Scene Heading" Number="1">
+      <Text>INT. LIGHTHOUSE - NIGHT</Text>
+    </Paragraph>
+    <Paragraph Type="Action">
+      <Text>The beam sweeps the water. </Text>
+      <Text>MARA grips the rail.</Text>
+    </Paragraph>
+    <Paragraph Type="Character">
+      <Text>MARA</Text>
+    </Paragraph>
+    <Paragraph Type="Parenthetical">
+      <Text>(quietly)</Text>
+    </Paragraph>
+    <Paragraph Type="Dialogue">
+      <Text>You said the storm would pass.</Text>
+    </Paragraph>
+    <Paragraph Type="Character">
+      <Text>KEELER (V.O.)</Text>
+    </Paragraph>
+    <Paragraph Type="Dialogue">
+      <Text>I say a lot of things.</Text>
+    </Paragraph>
+    <Paragraph Type="Transition">
+      <Text>CUT TO:</Text>
+    </Paragraph>
+    <Paragraph Type="Scene Heading" Number="2">
+      <Text>EXT. DOCK - DAY</Text>
+    </Paragraph>
+    <Paragraph Type="Character">
+      <Text>MARA</Text>
+      <DualDialogue/>
+    </Paragraph>
+    <Paragraph Type="Dialogue">
+      <Text>Storm's over.</Text>
+    </Paragraph>
+    <Paragraph Type="Cast List">
+      <Text>ignored paragraph type</Text>
+    </Paragraph>
+  </Content>
+  <TitlePage>
+    <Content>
+      <Paragraph Type="Centered">
+        <Text>Title: The Long Rain</Text>
+      </Paragraph>
+      <Paragraph Type="Centered">
+        <Text>Author: Jordan Avery</Text>
+      </Paragraph>
+    </Content>
+  </TitlePage>
+</FinalDraft>

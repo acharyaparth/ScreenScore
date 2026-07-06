@@ -10,6 +10,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "httpx>=0.27",
     "jsonschema>=4.22",
+    "pdfplumber>=0.11",
 ]
 
 [dependency-groups]
