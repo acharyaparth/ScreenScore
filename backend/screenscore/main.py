@@ -9,10 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+import os
+
 from . import ENGINE_VERSION, config, db
 from .api.routes import router
 from .pipeline.progress import ProgressBus
 from .runtime import OllamaRuntime
+from .runtime.fake import FakeRuntime
 
 
 def create_app() -> FastAPI:
@@ -22,7 +25,9 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="ScreenScore", version=ENGINE_VERSION, docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.state.conn = conn
-    app.state.runtime = OllamaRuntime()
+    # SCREENSCORE_FAKE_LLM=1: built-in fake model for UI dev / tests without
+    # Ollama; its reports are marked stub and bannered.
+    app.state.runtime = FakeRuntime() if os.environ.get("SCREENSCORE_FAKE_LLM") else OllamaRuntime()
     app.state.bus = ProgressBus()
 
     app.add_middleware(

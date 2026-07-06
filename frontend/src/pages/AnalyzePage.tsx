@@ -27,9 +27,28 @@ export default function AnalyzePage() {
   const fileInput = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
+  const [pulling, setPulling] = useState<Record<string, string>>({})
+
   useEffect(() => {
     api.hardware().then(setHardware).catch(() => setHardware(null))
   }, [])
+
+  async function pull(model: string) {
+    setPulling((p) => ({ ...p, [model]: 'starting…' }))
+    try {
+      await api.pullModel(model, (e) => {
+        const status = String(e.status ?? '')
+        const completed = Number(e.completed ?? 0)
+        const total = Number(e.total ?? 0)
+        const pct = total > 0 ? ` ${Math.round((completed / total) * 100)}%` : ''
+        setPulling((p) => ({ ...p, [model]: `${status}${pct}` }))
+      })
+      setPulling((p) => ({ ...p, [model]: 'done' }))
+      api.hardware().then(setHardware).catch(() => {})
+    } catch (e) {
+      setPulling((p) => ({ ...p, [model]: `failed: ${e instanceof Error ? e.message : e}` }))
+    }
+  }
 
   async function start(file: File) {
     setPhase('uploading')
@@ -102,14 +121,35 @@ export default function AnalyzePage() {
           </dl>
           {!hardware!.runtime_available && (
             <p className="mt-3 rounded bg-amber-50 p-3 text-amber-800">
-              Ollama isn’t reachable. Analysis in Phase 1 uses a stub pipeline, so you can still
-              try the flow — but install{' '}
+              Ollama isn’t reachable — analysis needs a local model runtime. Install{' '}
               <a href="https://ollama.com" className="underline" target="_blank" rel="noreferrer">
                 Ollama
               </a>{' '}
-              to be ready for real coverage.
+              (free), start it, and refresh this page.
             </p>
           )}
+          {hardware!.runtime_available &&
+            [
+              { role: 'worker', model: rec.worker_model, ready: hardware!.models_ready.worker },
+              { role: 'reasoning', model: rec.reasoning_model, ready: hardware!.models_ready.reasoning },
+            ]
+              .filter((m, i, all) => !m.ready && all.findIndex((x) => x.model === m.model) === i)
+              .map(({ model }) => (
+                <div key={model} className="mt-3 flex items-center gap-3 rounded bg-stone-50 p-3">
+                  <span className="font-mono text-xs">{model}</span>
+                  <span className="text-xs text-stone-400">not installed</span>
+                  {pulling[model] ? (
+                    <span className="text-xs text-stone-500">{pulling[model]}</span>
+                  ) : (
+                    <button
+                      onClick={() => pull(model)}
+                      className="rounded bg-stone-900 px-2.5 py-1 text-xs text-white hover:bg-stone-700"
+                    >
+                      Download
+                    </button>
+                  )}
+                </div>
+              ))}
           {rec.warnings.map((w) => (
             <p key={w} className="mt-2 text-xs text-stone-400">{w}</p>
           ))}

@@ -1,0 +1,15 @@
+You are a script coverage analyst's assistant. Summarize ONE scene of a screenplay, precisely and factually. Never invent anything that is not in the text.
+
+Scene $scene_number — slugline: $slugline
+
+Scene text:
+---
+$scene_text
+---
+
+Return ONLY valid JSON, no other text:
+{"summary": "1-2 sentences: what happens, who is involved", "tone": ["up to 3 lowercase tone tags"], "notable_lines": [{"speaker": "character name or ACTION", "line": "a line copied VERBATIM from the scene text"}]}
+
+Rules:
+- notable_lines: choose 0-2 lines a professional reader would quote (sharp dialogue, a key beat). Copy them character-for-character from the scene text — never paraphrase.
+- If the scene text is empty or unreadable, return {"summary": "", "tone": [], "notable_lines": []}.

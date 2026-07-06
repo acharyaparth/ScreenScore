@@ -15,10 +15,12 @@ ever performs is a model download you explicitly start. That's the whole point:
 writers and producers shouldn't have to upload unreleased IP to anyone's server
 to get a serious read.
 
-> **Status: v2 rewrite in progress — Phase 1 (skeleton & contracts) complete.**
-> The app runs end-to-end today: upload → staged pipeline with live progress →
-> stored report → project library. Reports are currently **stubs** (clearly
-> labeled) while the real analysis pipeline lands in Phase 3. See
+> **Status: v2 rewrite in progress — Phases 1–3 complete.** The full analysis
+> pipeline is live: upload → parse → per-scene map pass → eight scored
+> dimensions → synthesis → **citation verification** → report, with per-stage
+> caching and crash resume. Every citation is checked against the script;
+> scores that can't be grounded are withheld, not published. Phase 4
+> (evidence-to-script UI, project history, cross-draft diff) is next. See
 > [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
 ## Run it
@@ -96,9 +98,9 @@ the API is browsable at `http://localhost:8686/api/docs` while running.
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 1 | Skeleton & contracts: Docker one-liner, hardware-aware model recommendation, report + persistence schemas, stubbed end-to-end run | ✅ done |
-| 2 | Rock-solid parsing: PDF / TXT / Fountain / FDX → structured scenes & characters | next |
-| 3 | Real pipeline: map → specialists → synthesis, caching/resume, evidence verification | |
-| 4 | Report UI with evidence-to-script highlighting; project history; cross-draft diff | |
+| 2 | Rock-solid parsing: PDF / TXT / Fountain / FDX → structured scenes & characters | ✅ done |
+| 3 | Real pipeline: map → specialists → synthesis, caching/resume, evidence verification | ✅ done |
+| 4 | Report UI with evidence-to-script highlighting; project history; cross-draft diff | next |
 | 5 | Exports (PDF/MD/JSON), landing page, polish, docs | |
 
 ## Privacy, verifiably

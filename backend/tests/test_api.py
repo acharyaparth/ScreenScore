@@ -18,17 +18,6 @@ You said the storm would pass.
 """
 
 
-@pytest.fixture
-async def client(data_dir):
-    from screenscore.main import create_app
-
-    app = create_app()
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
-    app.state.conn.close()
-
-
 async def wait_complete(client, report_id, timeout=10.0):
     async def poll():
         while True:
@@ -105,7 +94,10 @@ async def test_sse_stream_reaches_done(client):
     types = [e["type"] for e in events]
     assert types[-1] == "done"
     stages = [e["stage"] for e in events if e["type"] == "stage" and e["status"] == "completed"]
-    assert stages == ["ingest", "segment", "map", "score", "synthesize", "assemble"]
+    assert stages == [
+        "parse", "segment", "map", "characters", "score", "notes",
+        "synthesize", "verify", "assemble",
+    ]
 
 
 async def test_sse_after_completion_replays_done(client):
@@ -159,7 +151,10 @@ async def test_analyze_uses_parsed_title_and_structure(client):
     # Characters and evidence quotes come from the real parse.
     assert [c["name"] for c in report["characters"]["principals"]] == ["MARA"]
     assert report["characters"]["principals"][0]["scene_numbers"] == [1]
-    assert report["rubric"][0]["evidence"][0]["quote"] == "You said the storm would pass."
+    # Evidence survived verification: the quote is a verbatim line of scene 1.
+    evidence = report["rubric"][0]["evidence"][0]
+    assert evidence["scene_number"] == 1
+    assert evidence["quote"] in FOUNTAIN_SAMPLE.decode()
 
 
 async def test_parse_endpoint_returns_cached_structure(client):
@@ -172,7 +167,7 @@ async def test_parse_endpoint_returns_cached_structure(client):
     assert parse["scenes"][0]["int_ext"] == "INT"
 
 
-async def test_unparseable_screenplay_still_analyzed_with_warning(client):
+async def test_unparseable_screenplay_fails_honestly(client):
     resp = await client.post(
         "/api/analyze", files={"file": ("notes.txt", b"just some prose notes\n", "text/plain")},
     )
@@ -180,7 +175,10 @@ async def test_unparseable_screenplay_still_analyzed_with_warning(client):
     ids = resp.json()
     assert any("no sluglines" in w for w in ids["parse_summary"]["warnings"])
     body = await wait_complete(client, ids["report_id"])
-    assert body["status"] == "complete"  # graceful: stub still completes
+    # No scenes → no analysis. The run fails with an actionable error instead
+    # of fabricating coverage of nothing.
+    assert body["status"] == "failed"
+    assert "segmented" in body["error"]
 
 
 async def test_unsupported_extension_rejected(client):

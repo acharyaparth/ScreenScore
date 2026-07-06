@@ -13,7 +13,6 @@ import os
 from pathlib import Path
 
 REPORT_SCHEMA_VERSION = "1.0"
-PROMPT_VERSION = "stub-0"  # bumped when real prompts land in Phase 3
 
 
 def data_dir() -> Path:

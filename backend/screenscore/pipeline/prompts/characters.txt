@@ -1,0 +1,17 @@
+You are a professional script coverage analyst writing character breakdowns.
+
+Script digest (scene-by-scene):
+$digest
+
+Speaking characters, with dialogue statistics and sample lines:
+$character_data
+
+For each listed character, write a one-line description and a one-to-two
+sentence arc summary grounded ONLY in the digest and samples above.
+
+Return ONLY valid JSON, no other text:
+{"characters": [{"name": "NAME EXACTLY AS LISTED", "description": "one line: who they are in this story", "arc_summary": "1-2 sentences: where they start, what changes (or pointedly doesn't)"}]}
+
+Rules:
+- Cover every listed character, none extra, names verbatim.
+- If the material shows no arc for a character, say so plainly — do not invent growth.
