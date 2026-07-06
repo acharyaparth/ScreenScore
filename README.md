@@ -1,95 +1,113 @@
-# ScreenScore - Screenplay Analysis Tool
+<p align="center">
+  <img src="docs/assets/logo.png" alt="ScreenScore" width="96" />
+</p>
 
-> **License:** ScreenScore is licensed under the GPLv3. All analysis is performed locally on your machine—your data never leaves your computer. 100% privacy-first, open-source, and free to use.
+# ScreenScore
 
-<div align="center">
-  <img src="docs/assets/logo.png" alt="ScreenScore Logo" width="200"/>
-  <br/>
-  <p><em>AI-powered screenplay analysis for film and TV producers</em></p>
-</div>
+**Local-first, private screenplay coverage.** Drop in a script, get professional-grade
+coverage — logline, synopsis, a scored rubric with in-script evidence, character
+breakdowns, comps, budget tier, content rating, and a Pass / Consider / Recommend
+call — produced entirely by **local models on your machine**.
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+**Your script never leaves your computer.** No cloud, no accounts, no telemetry,
+no outbound network calls during analysis. The only network activity ScreenScore
+ever performs is a model download you explicitly start. That's the whole point:
+writers and producers shouldn't have to upload unreleased IP to anyone's server
+to get a serious read.
 
-ScreenScore is an open-source tool that helps film and TV producers analyze screenplays for project greenlighting decisions. It runs entirely on your local machine, ensuring complete privacy for your screenplays.
+> **Status: v2 rewrite in progress — Phase 1 (skeleton & contracts) complete.**
+> The app runs end-to-end today: upload → staged pipeline with live progress →
+> stored report → project library. Reports are currently **stubs** (clearly
+> labeled) while the real analysis pipeline lands in Phase 3. See
+> [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
-## 🌟 Features
+## Run it
 
-- 📝 Upload screenplays in PDF or TXT format
-- 🤖 AI-powered analysis using local LLM (Mistral)
-- 📊 Comprehensive analysis including:
-  - Genre detection and confidence levels
-  - Tone and themes
-  - Character analysis and diversity
-  - Production complexity assessment
-  - Target audience and content rating
-  - Overall greenlight recommendation
-- 📈 Visual analysis reports
-- 📤 Export to PDF or Markdown
-- 🔒 Complete privacy - all processing happens locally
+### Docker (recommended)
 
-## 🚀 Quick Start
+```bash
+git clone https://github.com/acharyaparth/ScreenScore.git
+cd ScreenScore
+docker compose up
+```
 
-### Prerequisites
+Open **http://localhost:8686**.
 
-1. Install [Ollama](https://ollama.ai)
-2. Install [Node.js](https://nodejs.org) (v18 or later)
+**Models:** ScreenScore recommends a model pairing for your hardware on the
+Analyze page. On **macOS**, install [Ollama](https://ollama.com) natively (free)
+before `docker compose up` — the host app uses Apple's GPU; a container can't.
+On **Linux**, the bundled Ollama container is used automatically; its port is
+never exposed outside the compose network.
 
-### Installation
+### Native (development)
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/acharyaparth/ScreenScore.git
-   cd screenscore
-   ```
+Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 20+.
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+# backend — http://localhost:8686
+cd backend && uv sync && cd ..
+uv run --project backend uvicorn --factory screenscore.main:create_app --port 8686 --reload
 
-3. Start Ollama and pull the Mistral model:
-   ```bash
-   ollama pull mistral:7b-instruct-q4_K_M
-   ollama run mistral:7b-instruct-q4_K_M
-   ```
+# frontend (second terminal) — http://localhost:5173, proxies /api to 8686
+cd frontend && npm install && npm run dev
 
-4. Start the application:
-   ```bash
-   npm start
-   ```
+# tests
+cd backend && uv run pytest
+```
 
-5. Open http://localhost:5173 in your browser
+## How it works
 
-## 📚 Documentation
+A mega-prompt over a 120-page script can't do what a coverage analyst does. v2
+runs an explicit, inspectable pipeline instead:
 
-- [User Guide](docs/user-guide.md)
-- [API Documentation](docs/api.md)
-- [Development Guide](docs/development.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
-- [Troubleshooting](docs/troubleshooting.md)
+```
+ingest & parse → segment (scenes/acts) → map pass (small model, per scene)
+  → dimension specialists (strong model) → synthesis → report JSON
+```
 
-## 🤝 Contributing
+- **Two-tier models, hardware-aware.** A fast 7–8B worker handles high-volume
+  per-scene extraction; the strongest reasoning model your machine comfortably
+  fits (14B/32B, 70B opt-in) handles scoring and synthesis. Weak hardware
+  gracefully collapses to one small model — with an honest warning, never a failure.
+- **Evidence or it didn't happen.** Every rubric score is categorical
+  (Weak / Fair / Good / Excellent), carries a written rationale, and must cite
+  scene numbers + quoted lines that are verified to exist in the script. A
+  dimension without support says "insufficient evidence" instead of inventing a score.
+- **It remembers — locally.** Projects, drafts, immutable reports, and your own
+  annotations persist in SQLite plus a library folder under `data/`. Re-run a
+  revised draft and ScreenScore scores it **blind** (no peeking at prior scores),
+  then runs a separate diff pass to tell you what actually changed — including
+  regressions. It will not flatter a revision.
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+### Repo layout
 
-## 📝 License
+```
+backend/    FastAPI engine: pipeline, model runtime, persistence, report schema
+frontend/   React + Vite + Tailwind report UI
+docs/       decisions log, assets
+data/       (created at runtime, gitignored) SQLite DB + script/report library
+```
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+The report contract is [`backend/screenscore/schemas/report.schema.json`](backend/screenscore/schemas/report.schema.json);
+the API is browsable at `http://localhost:8686/api/docs` while running.
 
-## 🙏 Acknowledgments
+## Roadmap
 
-- [Ollama](https://ollama.ai) for the local LLM capabilities
-- [Mistral AI](https://mistral.ai) for the language model
-- All our contributors and users
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 1 | Skeleton & contracts: Docker one-liner, hardware-aware model recommendation, report + persistence schemas, stubbed end-to-end run | ✅ done |
+| 2 | Rock-solid parsing: PDF / TXT / Fountain / FDX → structured scenes & characters | next |
+| 3 | Real pipeline: map → specialists → synthesis, caching/resume, evidence verification | |
+| 4 | Report UI with evidence-to-script highlighting; project history; cross-draft diff | |
+| 5 | Exports (PDF/MD/JSON), landing page, polish, docs | |
 
-## 📞 Support
+## Privacy, verifiably
 
-- GitHub Issues: [https://github.com/acharyaparth/ScreenScore/issues](https://github.com/acharyaparth/ScreenScore/issues)
-- Community/Discord: Coming soon
-- Website: Coming soon
-- Twitter: Coming soon
+- Analysis makes zero outbound calls — once models are pulled, ScreenScore runs
+  with networking disabled.
+- The bundled Ollama's port is not published outside the Docker network.
+- All state lives in `data/` on your disk. Delete the folder, and it's gone.
 
-## 🔗 Links
+## License
 
-- GitHub: [https://github.com/acharyaparth/ScreenScore](https://github.com/acharyaparth/ScreenScore)
+[GPLv3](LICENSE). Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).

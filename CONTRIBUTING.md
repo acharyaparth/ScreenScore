@@ -47,25 +47,19 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
    cd screenscore
    ```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+2. Follow the **Native (development)** setup in the [README](README.md) —
+   backend (Python 3.12 + uv + FastAPI) and frontend (Node 20 + Vite) run
+   separately in development.
 
-3. Start Ollama:
+3. Run the backend tests before submitting:
    ```bash
-   ollama run mistral:7b-instruct-q4_K_M
-   ```
-
-4. Start the development server:
-   ```bash
-   npm start
+   cd backend && uv run pytest
    ```
 
 ### Code Style
 
 - Follow the existing code style
-- Use TypeScript for all new code
+- Python for the engine (`backend/`), TypeScript for the UI (`frontend/`)
 - Use meaningful variable and function names
 - Add comments for complex logic
 - Keep functions small and focused
