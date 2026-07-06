@@ -1,0 +1,36 @@
+# ScreenScore — one command: docker compose up
+# Then open http://localhost:8686
+#
+# Models: the app auto-discovers Ollama in this order:
+#   OLLAMA_URL env → Ollama on your machine (host) → the bundled `ollama`
+#   service below.
+# On macOS, prefer installing Ollama natively (https://ollama.com): the host
+# app uses Apple's Metal GPU; a Linux container cannot. The bundled service
+# exists so Linux users get a fully containerized setup with zero extra steps.
+#
+# Privacy: the ollama port is NOT published to the host or the network — it is
+# only reachable from the app container. Nothing else makes outbound calls.
+
+services:
+  app:
+    build: .
+    ports:
+      - "8686:8686"
+    volumes:
+      - screenscore-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # host Ollama reachable on Linux too
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+    # no ports: — model server stays private to the compose network
+
+volumes:
+  screenscore-data:
+  ollama-models:

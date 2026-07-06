@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/acharyaparth/ScreenScore/blob/main/backend/screenscore/schemas/report.schema.json",
+  "title": "ScreenScore Coverage Report",
+  "description": "The contract between the ScreenScore analysis engine and every consumer (report UI, exporters, diff pass). Version 1.0. Every scored claim must be traceable to in-script evidence; a dimension without support declares insufficient_evidence rather than inventing a score.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "meta",
+    "header",
+    "logline",
+    "synopsis",
+    "rubric",
+    "characters",
+    "comps",
+    "budget_tier",
+    "content_rating",
+    "scene_notes",
+    "recommendation"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "meta": {
+      "type": "object",
+      "required": ["report_id", "draft_id", "script_hash", "generated_at", "engine_version", "prompt_version", "models", "stub"],
+      "additionalProperties": false,
+      "properties": {
+        "report_id": { "type": "string" },
+        "draft_id": { "type": "string" },
+        "script_hash": { "type": "string", "description": "sha256 of the uploaded draft file" },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "engine_version": { "type": "string" },
+        "prompt_version": { "type": "string", "description": "Version of the prompt set that produced this report; reports are immutable and reproducible per (prompt_version, models)." },
+        "models": {
+          "type": "object",
+          "required": ["worker", "reasoning"],
+          "additionalProperties": false,
+          "properties": {
+            "worker": { "type": ["string", "null"], "description": "Model used for high-volume map passes" },
+            "reasoning": { "type": ["string", "null"], "description": "Model used for scoring and synthesis" }
+          }
+        },
+        "stub": { "type": "boolean", "description": "True when this report was produced by the stub pipeline (no real analysis). UI must label stub reports clearly." }
+      }
+    },
+    "header": {
+      "type": "object",
+      "required": ["title", "writers", "page_count", "estimated_runtime_minutes", "scene_count", "genres", "source_format"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string" },
+        "writers": { "type": "array", "items": { "type": "string" } },
+        "page_count": { "type": ["integer", "null"], "minimum": 1 },
+        "estimated_runtime_minutes": { "type": ["integer", "null"], "minimum": 1, "description": "≈1 page/min; approximate by definition" },
+        "scene_count": { "type": ["integer", "null"], "minimum": 1 },
+        "genres": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "confidence"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "source_format": { "enum": ["pdf", "txt", "fountain", "fdx"] },
+        "draft_label": { "type": ["string", "null"], "description": "Optional user-supplied label for this draft (e.g. 'Second pass after notes')" }
+      }
+    },
+    "logline": { "type": "string", "minLength": 1 },
+    "synopsis": {
+      "type": "object",
+      "required": ["acts"],
+      "additionalProperties": false,
+      "properties": {
+        "overview": { "type": ["string", "null"] },
+        "acts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["act", "summary"],
+            "additionalProperties": false,
+            "properties": {
+              "act": { "type": "string", "description": "Label, e.g. 'Act One'" },
+              "summary": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "rubric": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/rubric_dimension" }
+    },
+    "characters": {
+      "type": "object",
+      "required": ["principals", "graph"],
+      "additionalProperties": false,
+      "properties": {
+        "principals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "description", "dialogue_share", "scene_numbers", "arc_summary"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "dialogue_share": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "Fraction of all dialogue lines spoken by this character" },
+              "scene_numbers": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
+              "arc_summary": { "type": "string" }
+            }
+          }
+        },
+        "graph": {
+          "type": "object",
+          "required": ["edges"],
+          "additionalProperties": false,
+          "properties": {
+            "edges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["a", "b", "shared_scenes"],
+                "additionalProperties": false,
+                "properties": {
+                  "a": { "type": "string" },
+                  "b": { "type": "string" },
+                  "shared_scenes": { "type": "integer", "minimum": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "comps": {
+      "type": "object",
+      "required": ["disclaimer", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "disclaimer": { "type": "string", "description": "Must state comps are model-suggested from its own knowledge, not verified against any external source." },
+        "items": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["title", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "title": { "type": "string" },
+              "year": { "type": ["integer", "null"] },
+              "medium": { "enum": ["film", "tv", null] },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "budget_tier": {
+      "type": "object",
+      "required": ["tier", "drivers"],
+      "additionalProperties": false,
+      "properties": {
+        "tier": { "enum": ["micro", "low", "mid", "studio", "tentpole"] },
+        "drivers": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    },
+    "content_rating": {
+      "type": "object",
+      "required": ["estimated", "drivers"],
+      "additionalProperties": false,
+      "properties": {
+        "estimated": { "type": "string", "description": "e.g. 'PG-13', 'R'" },
+        "drivers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["category", "detail", "evidence"],
+            "additionalProperties": false,
+            "properties": {
+              "category": { "enum": ["language", "violence", "sexual_content", "substances", "thematic"] },
+              "detail": { "type": "string" },
+              "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+            }
+          }
+        }
+      }
+    },
+    "scene_notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["scene_number", "kind", "note"],
+        "additionalProperties": false,
+        "properties": {
+          "scene_number": { "type": "integer", "minimum": 1 },
+          "kind": { "enum": ["standout", "problem"] },
+          "note": { "type": "string" },
+          "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+        }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "required": ["verdict", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "verdict": { "enum": ["pass", "consider", "recommend"] },
+        "rationale": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "description": "A verifiable pointer into the script: scene number plus a quoted line. The verification stage checks these against the parsed script.",
+      "required": ["scene_number", "quote"],
+      "additionalProperties": false,
+      "properties": {
+        "scene_number": { "type": "integer", "minimum": 1 },
+        "quote": { "type": "string", "minLength": 1 },
+        "note": { "type": ["string", "null"] }
+      }
+    },
+    "rubric_dimension": {
+      "type": "object",
+      "required": ["id", "name", "score", "insufficient_evidence", "rationale", "evidence"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Stable machine id, e.g. 'structure_pacing'. New dimensions may be added without a schema bump." },
+        "name": { "type": "string" },
+        "score": { "enum": ["weak", "fair", "good", "excellent", null] },
+        "insufficient_evidence": { "type": "boolean" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "insufficient_evidence": { "const": false } } },
+          "then": {
+            "properties": { "score": { "enum": ["weak", "fair", "good", "excellent"] } },
+            "required": ["score"]
+          }
+        },
+        {
+          "if": { "properties": { "insufficient_evidence": { "const": false } } },
+          "then": { "properties": { "evidence": { "minItems": 1 } } }
+        },
+        {
+          "if": { "properties": { "insufficient_evidence": { "const": true } } },
+          "then": { "properties": { "score": { "const": null } } }
+        }
+      ]
+    }
+  }
+}

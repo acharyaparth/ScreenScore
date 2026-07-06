@@ -1,0 +1,203 @@
+"""Stub pipeline for Phase 1.
+
+Walks the real stage sequence (ingest → segment → map → score → synthesize →
+assemble), streams progress events, and lands a schema-valid *fake* report in
+SQLite + the library folder. It exists so the report contract, persistence,
+SSE progress, and UI are exercised before any real analysis lands in Phase 3.
+Every stub report is marked meta.stub = true and the UI labels it.
+"""
+
+import asyncio
+import json
+import sqlite3
+import traceback
+from datetime import datetime, timezone
+
+from .. import ENGINE_VERSION, config
+from ..db import repository
+from ..schemas import validate_report
+from .progress import ProgressBus
+
+STAGES = [
+    ("ingest", "Reading and normalizing the script"),
+    ("segment", "Deriving scenes, sequences and act structure"),
+    ("map", "Extracting per-scene and per-character digests"),
+    ("score", "Scoring rubric dimensions against evidence"),
+    ("synthesize", "Synthesizing logline, comps and recommendation"),
+    ("assemble", "Assembling and validating the report"),
+]
+
+STUB_SCENE_COUNT = 42
+
+
+async def run(
+    report_id: str,
+    conn: sqlite3.Connection,
+    bus: ProgressBus,
+) -> None:
+    """Run the stub pipeline for an existing queued report row."""
+    delay = config.stub_stage_delay()
+    try:
+        report_row = repository.get_report(conn, report_id)
+        draft = repository.get_draft(conn, report_row["draft_id"])
+        project = repository.get_project(conn, draft["project_id"])
+        repository.mark_report_running(conn, report_id)
+
+        for index, (stage_id, label) in enumerate(STAGES):
+            bus.publish(report_id, {
+                "type": "stage",
+                "stage": stage_id,
+                "label": label,
+                "status": "started",
+                "stage_index": index,
+                "stage_count": len(STAGES),
+            })
+            if stage_id == "map":
+                # The map pass is the long, per-scene part of a real run;
+                # simulate its granular ticks so the UI proves it can render them.
+                for scene in range(1, STUB_SCENE_COUNT + 1, 7):
+                    bus.publish(report_id, {
+                        "type": "tick",
+                        "stage": "map",
+                        "detail": f"scene {min(scene + 6, STUB_SCENE_COUNT)}/{STUB_SCENE_COUNT}",
+                    })
+                    await asyncio.sleep(delay / 6 if delay else 0)
+            else:
+                await asyncio.sleep(delay)
+            bus.publish(report_id, {
+                "type": "stage",
+                "stage": stage_id,
+                "label": label,
+                "status": "completed",
+                "stage_index": index,
+                "stage_count": len(STAGES),
+            })
+
+        report = build_stub_report(
+            report_id=report_id,
+            draft_id=draft["id"],
+            script_hash=draft["content_hash"],
+            title=project["title"],
+            source_format=draft["source_format"],
+            draft_label=draft["label"],
+        )
+        validate_report(report)
+
+        json_rel_path = f"reports/{report_id}.json"
+        json_abs_path = config.library_dir() / json_rel_path
+        json_abs_path.parent.mkdir(parents=True, exist_ok=True)
+        json_abs_path.write_text(json.dumps(report, indent=2))
+        repository.mark_report_complete(conn, report_id, json_rel_path)
+        bus.publish(report_id, {"type": "done", "report_id": report_id})
+    except Exception as exc:  # pragma: no cover - defensive
+        traceback.print_exc()
+        try:
+            repository.mark_report_failed(conn, report_id, str(exc))
+        except Exception:
+            pass
+        bus.publish(report_id, {"type": "failed", "error": str(exc)})
+
+
+def build_stub_report(
+    *,
+    report_id: str,
+    draft_id: str,
+    script_hash: str,
+    title: str,
+    source_format: str,
+    draft_label: str | None,
+) -> dict:
+    """A complete, schema-valid fake report. Clearly placeholder content."""
+    ev = lambda scene, quote: {"scene_number": scene, "quote": quote, "note": None}  # noqa: E731
+    placeholder = "[stub] Placeholder produced by the Phase 1 pipeline — no analysis was performed."
+    return {
+        "schema_version": "1.0",
+        "meta": {
+            "report_id": report_id,
+            "draft_id": draft_id,
+            "script_hash": script_hash,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "engine_version": ENGINE_VERSION,
+            "prompt_version": config.PROMPT_VERSION,
+            "models": {"worker": None, "reasoning": None},
+            "stub": True,
+        },
+        "header": {
+            "title": title,
+            "writers": [],
+            "page_count": 104,
+            "estimated_runtime_minutes": 104,
+            "scene_count": STUB_SCENE_COUNT,
+            "genres": [{"name": "Drama", "confidence": 0.5}],
+            "source_format": source_format,
+            "draft_label": draft_label,
+        },
+        "logline": f"[stub] A placeholder logline for “{title}” — the real pipeline arrives in Phase 3.",
+        "synopsis": {
+            "overview": placeholder,
+            "acts": [
+                {"act": "Act One", "summary": placeholder},
+                {"act": "Act Two", "summary": placeholder},
+                {"act": "Act Three", "summary": placeholder},
+            ],
+        },
+        "rubric": [
+            {
+                "id": dim_id,
+                "name": dim_name,
+                "score": "fair",
+                "insufficient_evidence": False,
+                "rationale": placeholder,
+                "evidence": [ev(3, "[stub] A quoted line would appear here, verified against the script.")],
+            }
+            for dim_id, dim_name in [
+                ("premise_originality", "Premise / Concept / Originality"),
+                ("structure_pacing", "Structure & Pacing"),
+                ("characterization", "Characterization"),
+                ("dialogue", "Dialogue"),
+                ("theme_resonance", "Theme & Emotional Resonance"),
+                ("marketability", "Marketability / Commercial Potential"),
+                ("production_complexity", "Production Complexity"),
+                ("representation_content", "Representation & Content"),
+            ]
+        ],
+        "characters": {
+            "principals": [
+                {
+                    "name": "PROTAGONIST",
+                    "description": placeholder,
+                    "dialogue_share": 0.34,
+                    "scene_numbers": [1, 3, 7, 12],
+                    "arc_summary": placeholder,
+                },
+                {
+                    "name": "ANTAGONIST",
+                    "description": placeholder,
+                    "dialogue_share": 0.21,
+                    "scene_numbers": [4, 7, 12],
+                    "arc_summary": placeholder,
+                },
+            ],
+            "graph": {"edges": [{"a": "PROTAGONIST", "b": "ANTAGONIST", "shared_scenes": 2}]},
+        },
+        "comps": {
+            "disclaimer": "Comparable titles are model-suggested from its own knowledge and are not verified against any external source.",
+            "items": [{"title": "[stub] Comparable Title", "year": 2020, "medium": "film", "reason": placeholder}],
+        },
+        "budget_tier": {"tier": "mid", "drivers": [placeholder]},
+        "content_rating": {
+            "estimated": "PG-13",
+            "drivers": [
+                {
+                    "category": "language",
+                    "detail": placeholder,
+                    "evidence": [ev(9, "[stub] A rating-driving quote would appear here.")],
+                }
+            ],
+        },
+        "scene_notes": [
+            {"scene_number": 7, "kind": "standout", "note": placeholder, "evidence": [ev(7, "[stub] Standout beat quote.")]},
+            {"scene_number": 23, "kind": "problem", "note": placeholder, "evidence": [ev(23, "[stub] Problem spot quote.")]},
+        ],
+        "recommendation": {"verdict": "consider", "rationale": placeholder},
+    }

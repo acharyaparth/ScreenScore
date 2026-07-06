@@ -52,3 +52,12 @@ test-reports/
 *.tmp
 *.temp
 .cache/
+
+# Local-only build brief / working docs (not committed)
+docs/BRIEF.md
+
+# Local data: SQLite DB + script/report library (never committed — user content)
+data/
+
+# Frontend build output
+frontend/dist/
