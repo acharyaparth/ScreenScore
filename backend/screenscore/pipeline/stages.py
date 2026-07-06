@@ -408,7 +408,11 @@ async def _scene_notes(ctx: PipelineContext, structure, digest: str) -> list[dic
         if note.get("quote"):
             item["evidence"] = [{"scene_number": note["scene_number"], "quote": str(note["quote"]), "note": None}]
         notes.append(item)
-    return notes[:8]
+    # Small models repeat themselves: one note per (scene, kind).
+    deduped: dict[tuple[int, str], dict] = {}
+    for item in notes:
+        deduped.setdefault((item["scene_number"], item["kind"]), item)
+    return list(deduped.values())[:8]
 
 
 async def _cached_json(ctx: PipelineContext, stage: str, model: str, prompt: str) -> dict:
@@ -516,7 +520,9 @@ def _assemble(
         "comps": {"disclaimer": COMPS_DISCLAIMER, "items": comps},
         "budget_tier": {"tier": tier, "drivers": drivers},
         "content_rating": {
-            "estimated": str((commercial.get("content_rating") or {}).get("estimated") or "unrated"),
+            # Small models sometimes echo the whole enum ("PG-13|R"); keep the
+            # first (mildest) option they named.
+            "estimated": str((commercial.get("content_rating") or {}).get("estimated") or "unrated").split("|")[0].strip() or "unrated",
             "drivers": rating_drivers,
         },
         "scene_notes": scene_notes,

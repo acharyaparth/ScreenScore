@@ -43,6 +43,21 @@ categorical scores, no native app, …) are not repeated here.
 | 19 | **Scanned/image PDFs are out of scope for now** — parser emits an explicit warning; OCR revisited post-v2 | OCR is a heavy dependency tree for a minority case; honest failure beats bad parses. |
 | 20 | Unparseable files are **accepted with warnings**, not rejected | Coverage of a badly formatted script is still the user's goal; warnings surface in the UI and the parse quality will gate scoring honesty in Phase 3 (insufficient evidence). |
 
+## Phase 3
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| 21 | Prompts use **string.Template files** (`pipeline/prompts/*.txt`), one PROMPT_VERSION for the set | Prompt bodies are full of JSON braces that str.format mangles; a single version in every cache key keeps reproducibility simple. |
+| 22 | **Per-scene map caching** (`map:0042`), all other stages one key each | A crash at scene 150 of 200 must not cost the first 149; coarser stages are cheap to redo individually. |
+| 23 | **Failure isolation policy:** map scene → fallback digest entry; specialist → insufficient_evidence; synthesis → run fails | A 20-minute run shouldn't die on one flaky generation, but a report without a logline/verdict isn't a report. |
+| 24 | **Verification policy:** citation kept if the (normalized) quote is in the cited scene; relocated if found in another scene; dropped otherwise; a scored dimension with zero surviving citations has its **score withheld** (insufficient_evidence) | Mechanical enforcement of the traceability bar — proven necessary in the first real-model run, where a 3B model's ungrounded dimensions were correctly withheld. |
+| 25 | **Verdict consistency guard** only ever pulls contradictions back to `consider` — never auto-upgrades to recommend or auto-downgrades to pass | The guard exists to block flattery/contradiction, not to replace the model's judgment. |
+| 26 | **Map pass is sequential by default** (SCREENSCORE_MAP_CONCURRENCY=1) | Ollama serializes requests anyway and Apple Silicon memory caution argues against parallel model pressure; env knob for capable machines. |
+| 27 | **FakeRuntime** (SCREENSCORE_FAKE_LLM=1) replaces the Phase-1 stub; it quotes real script lines so verification runs identically; its reports stay marked `stub` | One pipeline, two runtimes — dev/tests exercise the exact production code path. |
+| 28 | Scripts that parse to **zero scenes fail the run** with an actionable error (changed from Phase 2's warn-and-continue) | Real analysis of nothing would be fabrication; the parser warnings tell the user what to fix. |
+| 29 | JSON extraction: model asked for `format=json`, output run through fence/brace extraction, **one stricter retry**, then the stage's failure policy | Local instruct models are messy; two attempts catches most, and beyond that the failure policy is more honest than more retries. |
+| 30 | Temperatures 0.2 across analysis stages; num_ctx 8192 for reasoning (SCREENSCORE_NUM_CTX), 4096 worker; digest compacts to ~20k chars, never dropping scenes | Coverage should be reproducible, not creative; compaction keeps every scene citable within small-model contexts. |
+
 ## Process
 
 - Repo work happens on phase branches (`v2/phase-1`, …) merged to `main` only when
