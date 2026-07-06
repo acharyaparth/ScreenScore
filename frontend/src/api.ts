@@ -13,7 +13,15 @@ export const api = {
   project: (id: string) => getJson<ProjectDetail>(`/api/projects/${id}`),
   report: (id: string) => getJson<ReportRow>(`/api/reports/${id}`),
 
-  async analyze(file: File, projectId?: string): Promise<{ project_id: string; draft_id: string; report_id: string }> {
+  async analyze(
+    file: File,
+    projectId?: string,
+  ): Promise<{
+    project_id: string
+    draft_id: string
+    report_id: string
+    parse_summary: { title: string | null; scene_count: number; page_count: number | null; warnings: string[] }
+  }> {
     const form = new FormData()
     form.append('file', file)
     if (projectId) form.append('project_id', projectId)
