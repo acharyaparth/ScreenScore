@@ -103,6 +103,10 @@ export interface ProjectSummary {
   last_activity: string | null
 }
 
+export interface ReportListItem extends Omit<ReportRow, 'report'> {
+  annotation_counts: Record<AnnotationStatus, number>
+}
+
 export interface DraftDetail {
   id: string
   project_id: string
@@ -112,11 +116,12 @@ export interface DraftDetail {
   file_path: string
   label: string | null
   uploaded_at: string
-  reports: Omit<ReportRow, 'report'>[]
+  reports: ReportListItem[]
 }
 
 export interface ProjectDetail extends ProjectSummary {
   drafts: DraftDetail[]
+  diffs: DiffRow[]
 }
 
 export interface HealthInfo {
@@ -147,6 +152,81 @@ export interface HardwareInfo {
   runtime_available: boolean
   installed_models: string[]
   models_ready: { worker: boolean; reasoning: boolean }
+}
+
+export interface ParsedScene {
+  number: number
+  slugline: string
+  int_ext: string | null
+  location: string | null
+  time_of_day: string | null
+  raw_text: string
+}
+
+export interface ParseData {
+  title: string | null
+  scenes: ParsedScene[]
+  warnings: string[]
+}
+
+export type AnnotationStatus = 'addressed' | 'dismissed' | 'working'
+
+export interface Annotation {
+  id: string
+  report_id: string
+  target_ref: string
+  status: AnnotationStatus
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type DiffDirection =
+  | 'improved'
+  | 'declined'
+  | 'unchanged'
+  | 'newly_scored'
+  | 'newly_unscored'
+  | 'new_dimension'
+
+export interface DiffPayload {
+  mechanical: {
+    dimensions: {
+      id: string
+      name: string
+      from_score: Score | null
+      to_score: Score | null
+      direction: DiffDirection
+    }[]
+    verdict: { from: Verdict; to: Verdict }
+    size: {
+      from_pages: number | null
+      to_pages: number | null
+      from_scenes: number | null
+      to_scenes: number | null
+    }
+  }
+  narrative: {
+    overall: string
+    dimension_comments: { id: string; comment: string }[]
+    improved: string[]
+    persisted: string[]
+    new_issues: string[]
+    regressions: string[]
+  }
+  from_report_id: string
+  to_report_id: string
+}
+
+export interface DiffRow {
+  id: string
+  project_id: string
+  from_report_id: string
+  to_report_id: string
+  status: ReportStatus
+  error: string | null
+  payload: DiffPayload | null
+  created_at: string
 }
 
 export interface ProgressEvent {

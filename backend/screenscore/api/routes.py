@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from .. import ENGINE_VERSION, config, hardware
 from ..db import repository
 from ..parsing import PARSER_VERSION, parse_bytes
+from ..pipeline import diff as diffmod
 from ..pipeline import prompts, stages
 
 router = APIRouter()
@@ -32,6 +33,10 @@ def _title_from_filename(filename: str) -> str:
     stem = filename.rsplit(".", 1)[0]
     cleaned = re.sub(r"[_\-]+", " ", stem).strip()
     return cleaned.title() if cleaned else "Untitled"
+
+
+def _normalize_title(title: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()
 
 
 # -- health & hardware --------------------------------------------------------
@@ -89,9 +94,19 @@ def get_project(request: Request, project_id: str):
         raise HTTPException(404, "project not found")
     drafts = []
     for draft in repository.list_drafts(conn, project_id):
-        reports = [dict(r) for r in repository.list_reports(conn, draft["id"])]
+        reports = []
+        for report in repository.list_reports(conn, draft["id"]):
+            annotations = repository.list_annotations(conn, report["id"])
+            counts = {"addressed": 0, "dismissed": 0, "working": 0}
+            for a in annotations:
+                counts[a["status"]] = counts.get(a["status"], 0) + 1
+            reports.append({**dict(report), "annotation_counts": counts})
         drafts.append({**dict(draft), "reports": reports})
-    return {**dict(project), "drafts": drafts}
+    diffs = [
+        {**dict(d), "payload": json.loads(d["payload"]) if d["payload"] else None}
+        for d in repository.list_diffs(conn, project_id)
+    ]
+    return {**dict(project), "drafts": drafts, "diffs": diffs}
 
 
 # -- analyze ------------------------------------------------------------------
@@ -134,13 +149,23 @@ async def analyze(
             conn, content_hash, "parse", "-", PARSER_VERSION, json.dumps(parsed_dict)
         )
 
+    attached_to_existing = False
     if project_id:
         project = repository.get_project(conn, project_id)
         if project is None:
             raise HTTPException(404, "project not found")
     else:
         title = parsed_dict.get("title") or _title_from_filename(file.filename)
-        project = repository.create_project(conn, title)
+        # Draft-of-known-project detection: a re-upload with the same title is
+        # a new draft of that project, not a stranger.
+        project = next(
+            (p for p in repository.list_projects(conn)
+             if _normalize_title(p["title"]) == _normalize_title(title)),
+            None,
+        )
+        attached_to_existing = project is not None
+        if project is None:
+            project = repository.create_project(conn, title)
 
     draft = repository.find_draft_by_hash(conn, project["id"], content_hash)
     if draft is None:
@@ -178,6 +203,7 @@ async def analyze(
         "project_id": project["id"],
         "draft_id": draft["id"],
         "report_id": report["id"],
+        "attached_to_existing": attached_to_existing,
         "parse_summary": {
             "title": parsed_dict.get("title"),
             "scene_count": len(parsed_dict.get("scenes", [])),
@@ -241,6 +267,59 @@ async def report_events(request: Request, report_id: str):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# -- diffs ---------------------------------------------------------------------
+
+class DiffRequest(BaseModel):
+    from_report_id: str
+    to_report_id: str
+
+
+@router.post("/diffs")
+async def create_diff(request: Request, body: DiffRequest):
+    conn = request.app.state.conn
+    if body.from_report_id == body.to_report_id:
+        raise HTTPException(400, "cannot compare a report with itself")
+    from_row = repository.get_report(conn, body.from_report_id)
+    to_row = repository.get_report(conn, body.to_report_id)
+    if from_row is None or to_row is None:
+        raise HTTPException(404, "report not found")
+    if from_row["status"] != "complete" or to_row["status"] != "complete":
+        raise HTTPException(400, "both reports must be complete before comparing")
+    from_draft = repository.get_draft(conn, from_row["draft_id"])
+    to_draft = repository.get_draft(conn, to_row["draft_id"])
+    if from_draft["project_id"] != to_draft["project_id"]:
+        raise HTTPException(400, "reports belong to different projects")
+
+    existing = repository.find_diff(conn, body.from_report_id, body.to_report_id, prompts.PROMPT_VERSION)
+    if existing is not None:
+        if existing["status"] != "failed":
+            return {"diff_id": existing["id"], "status": existing["status"]}
+        repository.delete_diff(conn, existing["id"])
+
+    row = repository.create_diff(
+        conn,
+        project_id=to_draft["project_id"],
+        from_report_id=body.from_report_id,
+        to_report_id=body.to_report_id,
+        prompt_version=prompts.PROMPT_VERSION,
+        model=to_row["reasoning_model"],
+    )
+    asyncio.create_task(
+        diffmod.run_diff(row["id"], conn, request.app.state.bus, request.app.state.runtime)
+    )
+    return {"diff_id": row["id"], "status": "queued"}
+
+
+@router.get("/diffs/{diff_id}")
+def get_diff(request: Request, diff_id: str):
+    conn = request.app.state.conn
+    row = repository.get_diff(conn, diff_id)
+    if row is None:
+        raise HTTPException(404, "diff not found")
+    payload = json.loads(row["payload"]) if row["payload"] else None
+    return {**dict(row), "payload": payload}
 
 
 # -- models -------------------------------------------------------------------

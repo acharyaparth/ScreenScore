@@ -45,6 +45,8 @@ class FakeRuntime(ModelRuntime):
             return "narrative"
         if "commercial assessment" in prompt:
             return "commercial"
+        if "comparing two drafts" in prompt:
+            return "diff"
         return "unknown"
 
     async def generate(self, model, prompt, *, system=None, json_format=False, options=None) -> str:
@@ -70,6 +72,15 @@ class FakeRuntime(ModelRuntime):
                         {"act": "Act Three", "summary": "Resolution, rendered by the fake model."},
                     ],
                 },
+            })
+        if kind == "diff":
+            return json.dumps({
+                "overall": "A mixed revision: some tightening, one real step backward (fake-model narrative).",
+                "dimension_comments": [{"id": "dialogue", "comment": "Exchanges are leaner in the new draft (fake model)."}],
+                "improved": ["The opening now establishes the protagonist's want faster."],
+                "persisted": ["The midpoint still arrives without a reversal."],
+                "new_issues": ["A new subplot in the second half goes nowhere."],
+                "regressions": ["The earlier draft's ending had more consequence; the new one softens it."],
             })
         if kind == "commercial":
             return json.dumps({

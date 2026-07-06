@@ -213,6 +213,73 @@ def update_annotation(
     return get_annotation(conn, annotation_id)
 
 
+# -- diffs ---------------------------------------------------------------------
+
+def create_diff(
+    conn: sqlite3.Connection,
+    project_id: str,
+    from_report_id: str,
+    to_report_id: str,
+    prompt_version: str,
+    model: str | None,
+) -> sqlite3.Row:
+    did = _new_id()
+    conn.execute(
+        "INSERT INTO diffs (id, project_id, from_report_id, to_report_id, status,"
+        " prompt_version, model, created_at) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?)",
+        (did, project_id, from_report_id, to_report_id, prompt_version, model, now_iso()),
+    )
+    conn.commit()
+    return get_diff(conn, did)
+
+
+def get_diff(conn: sqlite3.Connection, diff_id: str) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM diffs WHERE id = ?", (diff_id,)).fetchone()
+
+
+def find_diff(
+    conn: sqlite3.Connection, from_report_id: str, to_report_id: str, prompt_version: str
+) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM diffs WHERE from_report_id = ? AND to_report_id = ? AND prompt_version = ?",
+        (from_report_id, to_report_id, prompt_version),
+    ).fetchone()
+
+
+def list_diffs(conn: sqlite3.Connection, project_id: str) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM diffs WHERE project_id = ? ORDER BY created_at DESC", (project_id,)
+    ).fetchall()
+
+
+def mark_diff_running(conn: sqlite3.Connection, diff_id: str) -> None:
+    conn.execute("UPDATE diffs SET status = 'running' WHERE id = ? AND status = 'queued'", (diff_id,))
+    conn.commit()
+
+
+def mark_diff_complete(conn: sqlite3.Connection, diff_id: str, payload: str) -> None:
+    conn.execute(
+        "UPDATE diffs SET status = 'complete', payload = ?, completed_at = ?"
+        " WHERE id = ? AND status = 'running'",
+        (payload, now_iso(), diff_id),
+    )
+    conn.commit()
+
+
+def mark_diff_failed(conn: sqlite3.Connection, diff_id: str, error: str) -> None:
+    conn.execute(
+        "UPDATE diffs SET status = 'failed', error = ?, completed_at = ?"
+        " WHERE id = ? AND status IN ('queued', 'running')",
+        (error, now_iso(), diff_id),
+    )
+    conn.commit()
+
+
+def delete_diff(conn: sqlite3.Connection, diff_id: str) -> None:
+    conn.execute("DELETE FROM diffs WHERE id = ?", (diff_id,))
+    conn.commit()
+
+
 # -- pipeline cache -----------------------------------------------------------
 
 def cache_get(

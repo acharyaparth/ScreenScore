@@ -15,12 +15,13 @@ ever performs is a model download you explicitly start. That's the whole point:
 writers and producers shouldn't have to upload unreleased IP to anyone's server
 to get a serious read.
 
-> **Status: v2 rewrite in progress — Phases 1–3 complete.** The full analysis
-> pipeline is live: upload → parse → per-scene map pass → eight scored
-> dimensions → synthesis → **citation verification** → report, with per-stage
-> caching and crash resume. Every citation is checked against the script;
-> scores that can't be grounded are withheld, not published. Phase 4
-> (evidence-to-script UI, project history, cross-draft diff) is next. See
+> **Status: v2 rewrite in progress — Phases 1–4 complete.** The full analysis
+> pipeline is live (per-scene map pass → eight scored dimensions → synthesis →
+> **citation verification**, with caching and crash resume), and so is the
+> product surface: click any citation to see it highlighted in the script,
+> annotate notes as addressed/dismissed/working, and compare drafts — each
+> draft is **scored blind**, then a separate diff pass reports what improved
+> *and what regressed*. Phase 5 (exports, landing page, polish) is next. See
 > [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
 ## Run it
@@ -100,8 +101,8 @@ the API is browsable at `http://localhost:8686/api/docs` while running.
 | 1 | Skeleton & contracts: Docker one-liner, hardware-aware model recommendation, report + persistence schemas, stubbed end-to-end run | ✅ done |
 | 2 | Rock-solid parsing: PDF / TXT / Fountain / FDX → structured scenes & characters | ✅ done |
 | 3 | Real pipeline: map → specialists → synthesis, caching/resume, evidence verification | ✅ done |
-| 4 | Report UI with evidence-to-script highlighting; project history; cross-draft diff | next |
-| 5 | Exports (PDF/MD/JSON), landing page, polish, docs | |
+| 4 | Report UI with evidence-to-script highlighting; project history; cross-draft diff | ✅ done |
+| 5 | Exports (PDF/MD/JSON), landing page, polish, docs | next |
 
 ## Privacy, verifiably
 
