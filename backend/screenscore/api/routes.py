@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from .. import ENGINE_VERSION, config, hardware
 from ..db import repository
+from ..parsing import PARSER_VERSION, parse_bytes
 from ..pipeline import stub
 
 router = APIRouter()
@@ -117,12 +118,27 @@ async def analyze(
         raise HTTPException(400, "Uploaded file is empty.")
     content_hash = hashlib.sha256(content).hexdigest()
 
+    # Parse now: it validates the file, recovers the real title, and the
+    # digest is cached for the pipeline (keyed by content hash + parser
+    # version, so a parser upgrade re-parses automatically).
+    cached = repository.cache_get(conn, content_hash, "parse", "-", PARSER_VERSION)
+    if cached is not None:
+        parsed_dict = json.loads(cached)
+    else:
+        parsed = await asyncio.to_thread(parse_bytes, content, source_format)
+        parsed_dict = parsed.as_dict()
+        parsed_dict["estimated_page_count"] = parsed.estimated_page_count()
+        repository.cache_put(
+            conn, content_hash, "parse", "-", PARSER_VERSION, json.dumps(parsed_dict)
+        )
+
     if project_id:
         project = repository.get_project(conn, project_id)
         if project is None:
             raise HTTPException(404, "project not found")
     else:
-        project = repository.create_project(conn, _title_from_filename(file.filename))
+        title = parsed_dict.get("title") or _title_from_filename(file.filename)
+        project = repository.create_project(conn, title)
 
     draft = repository.find_draft_by_hash(conn, project["id"], content_hash)
     if draft is None:
@@ -153,7 +169,26 @@ async def analyze(
         "project_id": project["id"],
         "draft_id": draft["id"],
         "report_id": report["id"],
+        "parse_summary": {
+            "title": parsed_dict.get("title"),
+            "scene_count": len(parsed_dict.get("scenes", [])),
+            "page_count": parsed_dict.get("page_count") or parsed_dict.get("estimated_page_count"),
+            "warnings": parsed_dict.get("warnings", []),
+        },
     }
+
+
+@router.get("/drafts/{draft_id}/parse")
+def get_parse(request: Request, draft_id: str):
+    """The cached structured parse for a draft (scenes, characters, warnings)."""
+    conn = request.app.state.conn
+    draft = repository.get_draft(conn, draft_id)
+    if draft is None:
+        raise HTTPException(404, "draft not found")
+    cached = repository.cache_get(conn, draft["content_hash"], "parse", "-", PARSER_VERSION)
+    if cached is None:
+        raise HTTPException(404, "no parse cached for this draft (re-upload to regenerate)")
+    return json.loads(cached)
 
 
 # -- reports ------------------------------------------------------------------

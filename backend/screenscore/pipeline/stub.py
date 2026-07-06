@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 from .. import ENGINE_VERSION, config
 from ..db import repository
+from ..parsing import PARSER_VERSION
 from ..schemas import validate_report
 from .progress import ProgressBus
 
@@ -27,7 +28,7 @@ STAGES = [
     ("assemble", "Assembling and validating the report"),
 ]
 
-STUB_SCENE_COUNT = 42
+FALLBACK_SCENE_COUNT = 42  # only when no parse is available
 
 
 async def run(
@@ -43,6 +44,12 @@ async def run(
         project = repository.get_project(conn, draft["project_id"])
         repository.mark_report_running(conn, report_id)
 
+        cached_parse = repository.cache_get(
+            conn, draft["content_hash"], "parse", "-", PARSER_VERSION
+        )
+        parsed = json.loads(cached_parse) if cached_parse else None
+        scene_total = len(parsed["scenes"]) if parsed and parsed["scenes"] else FALLBACK_SCENE_COUNT
+
         for index, (stage_id, label) in enumerate(STAGES):
             bus.publish(report_id, {
                 "type": "stage",
@@ -55,11 +62,12 @@ async def run(
             if stage_id == "map":
                 # The map pass is the long, per-scene part of a real run;
                 # simulate its granular ticks so the UI proves it can render them.
-                for scene in range(1, STUB_SCENE_COUNT + 1, 7):
+                step = max(1, scene_total // 6)
+                for scene_number in range(1, scene_total + 1, step):
                     bus.publish(report_id, {
                         "type": "tick",
                         "stage": "map",
-                        "detail": f"scene {min(scene + 6, STUB_SCENE_COUNT)}/{STUB_SCENE_COUNT}",
+                        "detail": f"scene {min(scene_number + step - 1, scene_total)}/{scene_total}",
                     })
                     await asyncio.sleep(delay / 6 if delay else 0)
             else:
@@ -80,6 +88,7 @@ async def run(
             title=project["title"],
             source_format=draft["source_format"],
             draft_label=draft["label"],
+            parsed=parsed,
         )
         validate_report(report)
 
@@ -98,6 +107,70 @@ async def run(
         bus.publish(report_id, {"type": "failed", "error": str(exc)})
 
 
+def _character_section(parsed: dict | None, placeholder: str) -> dict:
+    """Real character stats from the parse; placeholder prose around them."""
+    if not parsed or not parsed.get("scenes"):
+        return {
+            "principals": [
+                {
+                    "name": "PROTAGONIST",
+                    "description": placeholder,
+                    "dialogue_share": 0.34,
+                    "scene_numbers": [1, 3, 7, 12],
+                    "arc_summary": placeholder,
+                },
+            ],
+            "graph": {"edges": []},
+        }
+
+    line_counts: dict[str, int] = {}
+    scene_presence: dict[str, list[int]] = {}
+    pair_counts: dict[tuple[str, str], int] = {}
+    for scene in parsed["scenes"]:
+        present: list[str] = []
+        for element in scene["elements"]:
+            if element["type"] == "dialogue" and element["character"]:
+                name = element["character"]
+                line_counts[name] = line_counts.get(name, 0) + 1
+                if name not in present:
+                    present.append(name)
+                    scene_presence.setdefault(name, []).append(scene["number"])
+        for i, a in enumerate(present):
+            for b in present[i + 1:]:
+                pair_counts[tuple(sorted((a, b)))] = pair_counts.get(tuple(sorted((a, b))), 0) + 1
+
+    total_lines = sum(line_counts.values()) or 1
+    principals = [
+        {
+            "name": name,
+            "description": placeholder,
+            "dialogue_share": round(line_counts[name] / total_lines, 3),
+            "scene_numbers": scene_presence[name],
+            "arc_summary": placeholder,
+        }
+        for name in sorted(line_counts, key=lambda n: -line_counts[n])[:8]
+    ]
+    edges = [
+        {"a": a, "b": b, "shared_scenes": count}
+        for (a, b), count in sorted(pair_counts.items(), key=lambda kv: -kv[1])
+    ]
+    return {"principals": principals, "graph": {"edges": edges}}
+
+
+def _real_quote(parsed: dict | None, scene_number: int) -> str | None:
+    """First dialogue (else action) line of a scene — a genuinely verifiable quote."""
+    if not parsed:
+        return None
+    for scene in parsed.get("scenes", []):
+        if scene["number"] != scene_number:
+            continue
+        for wanted in ("dialogue", "action"):
+            for element in scene["elements"]:
+                if element["type"] == wanted and element["text"].strip():
+                    return element["text"].strip()
+    return None
+
+
 def build_stub_report(
     *,
     report_id: str,
@@ -106,10 +179,25 @@ def build_stub_report(
     title: str,
     source_format: str,
     draft_label: str | None,
+    parsed: dict | None = None,
 ) -> dict:
-    """A complete, schema-valid fake report. Clearly placeholder content."""
-    ev = lambda scene, quote: {"scene_number": scene, "quote": quote, "note": None}  # noqa: E731
+    """A schema-valid report: real structure (header counts, characters,
+    scene anchors, quotes) from the parse, placeholder judgment. Clearly
+    marked stub throughout."""
     placeholder = "[stub] Placeholder produced by the Phase 1 pipeline — no analysis was performed."
+
+    scenes = (parsed or {}).get("scenes") or []
+    scene_count = len(scenes) or None
+    page_count = (parsed or {}).get("page_count") or (parsed or {}).get("estimated_page_count")
+    first_scene = scenes[0]["number"] if scenes else 3
+    last_scene = scenes[-1]["number"] if scenes else 23
+    writers = (parsed or {}).get("authors") or []
+
+    def ev(scene: int, fallback: str) -> dict:
+        quote = _real_quote(parsed, scene) or fallback
+        note = None if quote != fallback else "[stub] no parsed line available"
+        return {"scene_number": scene, "quote": quote, "note": note}
+
     return {
         "schema_version": "1.0",
         "meta": {
@@ -124,10 +212,10 @@ def build_stub_report(
         },
         "header": {
             "title": title,
-            "writers": [],
-            "page_count": 104,
-            "estimated_runtime_minutes": 104,
-            "scene_count": STUB_SCENE_COUNT,
+            "writers": writers,
+            "page_count": page_count,
+            "estimated_runtime_minutes": page_count,
+            "scene_count": scene_count,
             "genres": [{"name": "Drama", "confidence": 0.5}],
             "source_format": source_format,
             "draft_label": draft_label,
@@ -148,7 +236,7 @@ def build_stub_report(
                 "score": "fair",
                 "insufficient_evidence": False,
                 "rationale": placeholder,
-                "evidence": [ev(3, "[stub] A quoted line would appear here, verified against the script.")],
+                "evidence": [ev(first_scene, "[stub] A quoted line would appear here, verified against the script.")],
             }
             for dim_id, dim_name in [
                 ("premise_originality", "Premise / Concept / Originality"),
@@ -161,25 +249,7 @@ def build_stub_report(
                 ("representation_content", "Representation & Content"),
             ]
         ],
-        "characters": {
-            "principals": [
-                {
-                    "name": "PROTAGONIST",
-                    "description": placeholder,
-                    "dialogue_share": 0.34,
-                    "scene_numbers": [1, 3, 7, 12],
-                    "arc_summary": placeholder,
-                },
-                {
-                    "name": "ANTAGONIST",
-                    "description": placeholder,
-                    "dialogue_share": 0.21,
-                    "scene_numbers": [4, 7, 12],
-                    "arc_summary": placeholder,
-                },
-            ],
-            "graph": {"edges": [{"a": "PROTAGONIST", "b": "ANTAGONIST", "shared_scenes": 2}]},
-        },
+        "characters": _character_section(parsed, placeholder),
         "comps": {
             "disclaimer": "Comparable titles are model-suggested from its own knowledge and are not verified against any external source.",
             "items": [{"title": "[stub] Comparable Title", "year": 2020, "medium": "film", "reason": placeholder}],
@@ -191,13 +261,13 @@ def build_stub_report(
                 {
                     "category": "language",
                     "detail": placeholder,
-                    "evidence": [ev(9, "[stub] A rating-driving quote would appear here.")],
+                    "evidence": [ev(first_scene, "[stub] A rating-driving quote would appear here.")],
                 }
             ],
         },
         "scene_notes": [
-            {"scene_number": 7, "kind": "standout", "note": placeholder, "evidence": [ev(7, "[stub] Standout beat quote.")]},
-            {"scene_number": 23, "kind": "problem", "note": placeholder, "evidence": [ev(23, "[stub] Problem spot quote.")]},
+            {"scene_number": first_scene, "kind": "standout", "note": placeholder, "evidence": [ev(first_scene, "[stub] Standout beat quote.")]},
+            {"scene_number": last_scene, "kind": "problem", "note": placeholder, "evidence": [ev(last_scene, "[stub] Problem spot quote.")]},
         ],
         "recommendation": {"verdict": "consider", "rationale": placeholder},
     }

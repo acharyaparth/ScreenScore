@@ -16,6 +16,12 @@ export default function AnalyzePage() {
   const [hardware, setHardware] = useState<HardwareInfo | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [stages, setStages] = useState<StageState[]>([])
+  const [parseSummary, setParseSummary] = useState<{
+    title: string | null
+    scene_count: number
+    page_count: number | null
+    warnings: string[]
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -31,6 +37,7 @@ export default function AnalyzePage() {
     setStages([])
     try {
       const ids = await api.analyze(file)
+      setParseSummary(ids.parse_summary)
       setPhase('running')
       const source = api.progressEvents(ids.report_id)
       source.onmessage = (msg) => {
@@ -147,8 +154,19 @@ export default function AnalyzePage() {
       {(phase === 'uploading' || phase === 'running') && (
         <div className="mt-6 rounded-lg border border-stone-200 bg-white p-5">
           <h2 className="text-sm font-medium">
-            {phase === 'uploading' ? 'Uploading…' : 'Analyzing'}
+            {phase === 'uploading' ? 'Uploading…' : `Analyzing${parseSummary?.title ? ` “${parseSummary.title}”` : ''}`}
           </h2>
+          {parseSummary && phase === 'running' && (
+            <p className="mt-1 text-xs text-stone-400">
+              {parseSummary.scene_count} scenes
+              {parseSummary.page_count ? ` · ${parseSummary.page_count} pages` : ''}
+            </p>
+          )}
+          {parseSummary?.warnings.map((w) => (
+            <p key={w} className="mt-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Parser: {w}
+            </p>
+          ))}
           <ul className="mt-3 space-y-2 text-sm">
             {stages.map((s) => (
               <li key={s.stage} className="flex items-center gap-2">

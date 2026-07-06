@@ -140,6 +140,49 @@ async def test_duplicate_upload_reuses_draft(client):
     await wait_complete(client, second["report_id"])
 
 
+async def test_analyze_uses_parsed_title_and_structure(client):
+    resp = await client.post(
+        "/api/analyze",
+        files={"file": ("some_random_filename.fountain", FOUNTAIN_SAMPLE, "text/plain")},
+    )
+    ids = resp.json()
+    # Project title comes from the script's title page, not the filename.
+    assert ids["parse_summary"]["title"] == "Cold Open"
+    assert ids["parse_summary"]["scene_count"] == 1
+    project = (await client.get(f"/api/projects/{ids['project_id']}")).json()
+    assert project["title"] == "Cold Open"
+
+    body = await wait_complete(client, ids["report_id"])
+    report = body["report"]
+    assert report["header"]["scene_count"] == 1
+    assert report["header"]["writers"] == ["Test Writer"]
+    # Characters and evidence quotes come from the real parse.
+    assert [c["name"] for c in report["characters"]["principals"]] == ["MARA"]
+    assert report["characters"]["principals"][0]["scene_numbers"] == [1]
+    assert report["rubric"][0]["evidence"][0]["quote"] == "You said the storm would pass."
+
+
+async def test_parse_endpoint_returns_cached_structure(client):
+    ids = (await client.post(
+        "/api/analyze", files={"file": ("x.fountain", FOUNTAIN_SAMPLE, "text/plain")},
+    )).json()
+    parse = (await client.get(f"/api/drafts/{ids['draft_id']}/parse")).json()
+    assert parse["title"] == "Cold Open"
+    assert parse["scenes"][0]["slugline"] == "INT. LIGHTHOUSE - NIGHT"
+    assert parse["scenes"][0]["int_ext"] == "INT"
+
+
+async def test_unparseable_screenplay_still_analyzed_with_warning(client):
+    resp = await client.post(
+        "/api/analyze", files={"file": ("notes.txt", b"just some prose notes\n", "text/plain")},
+    )
+    assert resp.status_code == 200
+    ids = resp.json()
+    assert any("no sluglines" in w for w in ids["parse_summary"]["warnings"])
+    body = await wait_complete(client, ids["report_id"])
+    assert body["status"] == "complete"  # graceful: stub still completes
+
+
 async def test_unsupported_extension_rejected(client):
     resp = await client.post(
         "/api/analyze", files={"file": ("script.docx", b"whatever", "application/octet-stream")},
