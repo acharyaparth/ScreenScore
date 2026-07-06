@@ -58,6 +58,18 @@ categorical scores, no native app, …) are not repeated here.
 | 29 | JSON extraction: model asked for `format=json`, output run through fence/brace extraction, **one stricter retry**, then the stage's failure policy | Local instruct models are messy; two attempts catches most, and beyond that the failure policy is more honest than more retries. |
 | 30 | Temperatures 0.2 across analysis stages; num_ctx 8192 for reasoning (SCREENSCORE_NUM_CTX), 4096 worker; digest compacts to ~20k chars, never dropping scenes | Coverage should be reproducible, not creative; compaction keeps every scene citable within small-model contexts. |
 
+## Phase 4
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| 31 | Diff payloads are **informal JSON** (not a versioned schema file like reports) with a mechanical layer marked authoritative | Reports are the long-lived multi-consumer contract; diffs are derived views of two immutable reports and can be regenerated at any time. |
+| 32 | **Blindness is structural**: the scoring pipeline has no code path that reads the reports table; only `pipeline/diff.py` loads two reports | Enforcing "score blind, then diff" by architecture beats enforcing it by prompt discipline. |
+| 33 | Diff narrative prompt **explicitly requires a regressions list** and forbids assuming improvement; the mechanical score-movement table is computed, not model-claimed | The flattery failure mode the brief warns about is countered both mechanically and contractually. |
+| 34 | Diffs are **reused per (from_report, to_report, prompt_version)**; failed diffs are deleted and re-created on request | Same reproducibility contract as reports without pretending diffs are immutable artifacts. |
+| 35 | Draft-of-known-project detection = **exact normalized-title match** (lowercase, alphanumerics), with a project picker on the Analyze page as the explicit override | Fuzzy matching mis-attaching a stranger's script into the wrong project history is worse than occasionally creating a duplicate project; the picker covers renames. |
+| 36 | Evidence→script highlighting matches quotes with **length-preserving normalization** (case + curly quotes only) | Keeps the highlight exact against the original text; verification already guaranteed near-verbatim quotes. |
+| 37 | Annotation target refs are **JSON pointers into the immutable report** (`/rubric/3`, `/scene_notes/1`) | Reports never change, so index-based pointers are stable forever and need no extra IDs. |
+
 ## Process
 
 - Repo work happens on phase branches (`v2/phase-1`, …) merged to `main` only when

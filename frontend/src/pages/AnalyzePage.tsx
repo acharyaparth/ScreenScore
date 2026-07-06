@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import type { HardwareInfo, ProgressEvent } from '../types'
+import type { HardwareInfo, ProgressEvent, ProjectSummary } from '../types'
 
 type Phase = 'idle' | 'uploading' | 'running' | 'failed'
 
@@ -28,9 +28,13 @@ export default function AnalyzePage() {
   const navigate = useNavigate()
 
   const [pulling, setPulling] = useState<Record<string, string>>({})
+  const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [targetProject, setTargetProject] = useState('') // '' = detect automatically
+  const [attachedNotice, setAttachedNotice] = useState<string | null>(null)
 
   useEffect(() => {
     api.hardware().then(setHardware).catch(() => setHardware(null))
+    api.projects().then((r) => setProjects(r.projects)).catch(() => {})
   }, [])
 
   async function pull(model: string) {
@@ -55,8 +59,13 @@ export default function AnalyzePage() {
     setError(null)
     setStages([])
     try {
-      const ids = await api.analyze(file)
+      const ids = await api.analyze(file, targetProject || undefined)
       setParseSummary(ids.parse_summary)
+      setAttachedNotice(
+        ids.attached_to_existing
+          ? 'Recognized as a new draft of an existing project — added to its history.'
+          : null,
+      )
       setPhase('running')
       const source = api.progressEvents(ids.report_id)
       source.onmessage = (msg) => {
@@ -156,6 +165,22 @@ export default function AnalyzePage() {
         </div>
       )}
 
+      {projects.length > 0 && (phase === 'idle' || phase === 'failed') && (
+        <label className="mt-6 block text-sm">
+          <span className="text-stone-500">Project</span>
+          <select
+            value={targetProject}
+            onChange={(e) => setTargetProject(e.target.value)}
+            className="ml-2 rounded border border-stone-300 px-2 py-1.5 text-xs"
+          >
+            <option value="">Detect automatically (match by title)</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.title}</option>
+            ))}
+          </select>
+        </label>
+      )}
+
       {(phase === 'idle' || phase === 'failed') && (
         <div
           className={`mt-6 cursor-pointer rounded-lg border-2 border-dashed p-12 text-center transition-colors ${
@@ -201,6 +226,9 @@ export default function AnalyzePage() {
               {parseSummary.scene_count} scenes
               {parseSummary.page_count ? ` · ${parseSummary.page_count} pages` : ''}
             </p>
+          )}
+          {attachedNotice && (
+            <p className="mt-2 rounded bg-stone-50 px-3 py-2 text-xs text-stone-500">{attachedNotice}</p>
           )}
           {parseSummary?.warnings.map((w) => (
             <p key={w} className="mt-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-800">

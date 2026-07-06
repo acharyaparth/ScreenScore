@@ -1,4 +1,14 @@
-import type { HardwareInfo, HealthInfo, ProjectDetail, ProjectSummary, ReportRow } from './types'
+import type {
+  Annotation,
+  AnnotationStatus,
+  DiffRow,
+  HardwareInfo,
+  HealthInfo,
+  ParseData,
+  ProjectDetail,
+  ProjectSummary,
+  ReportRow,
+} from './types'
 
 async function getJson<T>(url: string): Promise<T> {
   const resp = await fetch(url)
@@ -12,6 +22,51 @@ export const api = {
   projects: () => getJson<{ projects: ProjectSummary[] }>('/api/projects'),
   project: (id: string) => getJson<ProjectDetail>(`/api/projects/${id}`),
   report: (id: string) => getJson<ReportRow>(`/api/reports/${id}`),
+  parse: (draftId: string) => getJson<ParseData>(`/api/drafts/${draftId}/parse`),
+  annotations: (reportId: string) =>
+    getJson<{ annotations: Annotation[] }>(`/api/reports/${reportId}/annotations`),
+  diff: (id: string) => getJson<DiffRow>(`/api/diffs/${id}`),
+
+  async createAnnotation(
+    reportId: string,
+    targetRef: string,
+    status: AnnotationStatus,
+    note?: string,
+  ): Promise<Annotation> {
+    const resp = await fetch(`/api/reports/${reportId}/annotations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_ref: targetRef, status, note: note ?? null }),
+    })
+    if (!resp.ok) throw new Error(`annotation failed (${resp.status})`)
+    return resp.json()
+  },
+
+  async updateAnnotation(
+    id: string,
+    patch: { status?: AnnotationStatus; note?: string },
+  ): Promise<Annotation> {
+    const resp = await fetch(`/api/annotations/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!resp.ok) throw new Error(`annotation update failed (${resp.status})`)
+    return resp.json()
+  },
+
+  async createDiff(fromReportId: string, toReportId: string): Promise<{ diff_id: string }> {
+    const resp = await fetch('/api/diffs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from_report_id: fromReportId, to_report_id: toReportId }),
+    })
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => null)
+      throw new Error(body?.detail ?? `diff failed (${resp.status})`)
+    }
+    return resp.json()
+  },
 
   async analyze(
     file: File,
@@ -20,6 +75,7 @@ export const api = {
     project_id: string
     draft_id: string
     report_id: string
+    attached_to_existing: boolean
     parse_summary: { title: string | null; scene_count: number; page_count: number | null; warnings: string[] }
   }> {
     const form = new FormData()

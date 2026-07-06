@@ -1,5 +1,6 @@
 import { Link, Route, Routes } from 'react-router-dom'
 import AnalyzePage from './pages/AnalyzePage'
+import DiffPage from './pages/DiffPage'
 import LibraryPage from './pages/LibraryPage'
 import ProjectPage from './pages/ProjectPage'
 import ReportPage from './pages/ReportPage'
@@ -20,12 +21,13 @@ export default function App() {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-4xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-6 py-10">
         <Routes>
           <Route path="/" element={<LibraryPage />} />
           <Route path="/analyze" element={<AnalyzePage />} />
           <Route path="/projects/:projectId" element={<ProjectPage />} />
           <Route path="/reports/:reportId" element={<ReportPage />} />
+          <Route path="/diffs/:diffId" element={<DiffPage />} />
         </Routes>
       </main>
       <footer className="mx-auto max-w-4xl px-6 pb-10 text-xs text-stone-400">
