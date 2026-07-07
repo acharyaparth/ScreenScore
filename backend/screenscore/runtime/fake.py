@@ -63,7 +63,7 @@ class FakeRuntime(ModelRuntime):
             return self._notes(prompt)
         if kind == "narrative":
             return json.dumps({
-                "logline": "A determined protagonist confronts an escalating obstacle with real stakes.",
+                "logline": "A man out of chances asks the one person who never forgave him to help him fix what he broke.",
                 "synopsis": {
                     "overview": "A fake-model synopsis for development purposes.",
                     "acts": [
@@ -91,7 +91,9 @@ class FakeRuntime(ModelRuntime):
                 "content_rating": {"estimated": "PG-13",
                                    "drivers": [{"category": "thematic", "detail": "tense peril throughout"}]},
                 "recommendation": {"verdict": "consider",
-                                   "rationale": "Fake-model verdict, consistent with mostly-good rubric scores."},
+                                   "rationale": "A contained character piece with a clear engine and two castable "
+                                                "leads. The craft dimensions hold up; the middle needs one more "
+                                                "genuine turn before this is a confident recommend."},
             })
         return json.dumps({})
 

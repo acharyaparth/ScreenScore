@@ -13,9 +13,7 @@ def data_dir(tmp_path, monkeypatch):
 async def app(data_dir):
     from screenscore.main import create_app
 
-    application = create_app()
-    yield application
-    application.state.conn.close()
+    yield create_app()
 
 
 @pytest.fixture

@@ -70,6 +70,16 @@ categorical scores, no native app, …) are not repeated here.
 | 36 | Evidence→script highlighting matches quotes with **length-preserving normalization** (case + curly quotes only) | Keeps the highlight exact against the original text; verification already guaranteed near-verbatim quotes. |
 | 37 | Annotation target refs are **JSON pointers into the immutable report** (`/rubric/3`, `/scene_notes/1`) | Reports never change, so index-based pointers are stable forever and need no extra IDs. |
 
+## Phase 5
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| 38 | **fpdf2** for PDF export, core fonts + latin-1 transliteration (curly quotes/dashes mapped) | Pure-Python, tiny, no system deps; coverage is English prose where latin-1 loses nothing users care about. Revisit with an embedded Unicode font if international scripts demand it. |
+| 39 | Exports render **from the immutable report JSON** on the backend (`export.py`), one endpoint `GET /api/reports/{id}/export/{fmt}` | Same source of truth as the UI, testable, and usable from curl/scripts without a browser. |
+| 40 | **SQLite connections are per-consumer**: one per HTTP request (FastAPI dependency), one owned by each pipeline/diff task — never shared across threads | The Phase-1 shared connection corrupted under real browser concurrency (`InterfaceError: bad parameter or other API misuse`); WAL + busy_timeout make per-request connections cheap and safe. |
+| 41 | Landing page is a **single self-contained `docs/index.html`** served by GitHub Pages (main, `/docs`) | No build step, no dependencies, survives forever; Pages-from-docs keeps the repo root clean. Operator must enable Pages once in repo settings. |
+| 42 | Landing screenshot is a real app screenshot of a **demo-model report on a sample scene, labeled as such**; replace with a full-length real-model report screenshot when one exists | Honest about provenance without blocking the page on a 20-minute real run; the caption says exactly what it is. |
+
 ## Process
 
 - Repo work happens on phase branches (`v2/phase-1`, …) merged to `main` only when

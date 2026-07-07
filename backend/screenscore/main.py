@@ -20,11 +20,12 @@ from .runtime.fake import FakeRuntime
 
 def create_app() -> FastAPI:
     config.ensure_dirs()
-    conn = db.connect(config.db_path())
-    db.migrate(conn)
+    migrate_conn = db.connect(config.db_path())
+    db.migrate(migrate_conn)
+    migrate_conn.close()
 
     app = FastAPI(title="ScreenScore", version=ENGINE_VERSION, docs_url="/api/docs", openapi_url="/api/openapi.json")
-    app.state.conn = conn
+    app.state.db_path = config.db_path()
     # SCREENSCORE_FAKE_LLM=1: built-in fake model for UI dev / tests without
     # Ollama; its reports are marked stub and bannered.
     app.state.runtime = FakeRuntime() if os.environ.get("SCREENSCORE_FAKE_LLM") else OllamaRuntime()
