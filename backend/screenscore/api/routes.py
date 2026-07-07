@@ -1,5 +1,11 @@
 """HTTP API. The frontend (and any other consumer) talks only to these routes.
 
+Database access: sqlite3 connections are NOT safe to share across FastAPI's
+request threadpool, so every request opens its own connection via the
+`get_conn` dependency (closed after the response — including after SSE
+streams end), and every background pipeline task owns a private connection
+for its lifetime. WAL mode keeps concurrent readers cheap.
+
 Privacy note: nothing here makes an outbound network call except the model
 runtime talking to a local Ollama, and the (user-initiated) model pull.
 """
@@ -8,12 +14,14 @@ import asyncio
 import hashlib
 import json
 import re
+import sqlite3
+from typing import Iterator
 
-from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
-from .. import ENGINE_VERSION, config, hardware
+from .. import ENGINE_VERSION, config, db, export, hardware
 from ..db import repository
 from ..parsing import PARSER_VERSION, parse_bytes
 from ..pipeline import diff as diffmod
@@ -25,8 +33,12 @@ MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 EXTENSION_FORMATS = {".pdf": "pdf", ".txt": "txt", ".fountain": "fountain", ".fdx": "fdx"}
 
 
-def _row(row) -> dict | None:
-    return dict(row) if row is not None else None
+def get_conn(request: Request) -> Iterator[sqlite3.Connection]:
+    conn = db.connect(request.app.state.db_path)
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def _title_from_filename(filename: str) -> str:
@@ -42,8 +54,7 @@ def _normalize_title(title: str) -> str:
 # -- health & hardware --------------------------------------------------------
 
 @router.get("/health")
-async def health(request: Request):
-    conn = request.app.state.conn
+async def health(request: Request, conn: sqlite3.Connection = Depends(get_conn)):
     conn.execute("SELECT 1")
     runtime_info = await request.app.state.runtime.info()
     return {
@@ -81,14 +92,12 @@ async def hardware_info(request: Request):
 # -- projects & library -------------------------------------------------------
 
 @router.get("/projects")
-def list_projects(request: Request):
-    conn = request.app.state.conn
+def list_projects(conn: sqlite3.Connection = Depends(get_conn)):
     return {"projects": [dict(r) for r in repository.list_projects(conn)]}
 
 
 @router.get("/projects/{project_id}")
-def get_project(request: Request, project_id: str):
-    conn = request.app.state.conn
+def get_project(project_id: str, conn: sqlite3.Connection = Depends(get_conn)):
     project = repository.get_project(conn, project_id)
     if project is None:
         raise HTTPException(404, "project not found")
@@ -119,8 +128,8 @@ async def analyze(
     draft_label: str | None = Form(default=None),
     worker_model: str | None = Form(default=None),
     reasoning_model: str | None = Form(default=None),
+    conn: sqlite3.Connection = Depends(get_conn),
 ):
-    conn = request.app.state.conn
     bus = request.app.state.bus
 
     suffix = ("." + file.filename.rsplit(".", 1)[-1].lower()) if "." in (file.filename or "") else ""
@@ -196,8 +205,10 @@ async def analyze(
         worker_model=worker_model,
         reasoning_model=reasoning_model,
     )
+    # The pipeline task owns a private connection for its whole run.
+    task_conn = db.connect(request.app.state.db_path)
     asyncio.create_task(
-        stages.run_pipeline(report["id"], conn, bus, request.app.state.runtime)
+        stages.run_pipeline(report["id"], task_conn, bus, request.app.state.runtime)
     )
     return {
         "project_id": project["id"],
@@ -214,9 +225,8 @@ async def analyze(
 
 
 @router.get("/drafts/{draft_id}/parse")
-def get_parse(request: Request, draft_id: str):
+def get_parse(draft_id: str, conn: sqlite3.Connection = Depends(get_conn)):
     """The cached structured parse for a draft (scenes, characters, warnings)."""
-    conn = request.app.state.conn
     draft = repository.get_draft(conn, draft_id)
     if draft is None:
         raise HTTPException(404, "draft not found")
@@ -229,8 +239,7 @@ def get_parse(request: Request, draft_id: str):
 # -- reports ------------------------------------------------------------------
 
 @router.get("/reports/{report_id}")
-def get_report(request: Request, report_id: str):
-    conn = request.app.state.conn
+def get_report(report_id: str, conn: sqlite3.Connection = Depends(get_conn)):
     row = repository.get_report(conn, report_id)
     if row is None:
         raise HTTPException(404, "report not found")
@@ -240,9 +249,41 @@ def get_report(request: Request, report_id: str):
     return payload
 
 
+EXPORT_FORMATS = {
+    "json": ("application/json", "json"),
+    "md": ("text/markdown; charset=utf-8", "md"),
+    "pdf": ("application/pdf", "pdf"),
+}
+
+
+@router.get("/reports/{report_id}/export/{fmt}")
+def export_report(report_id: str, fmt: str, conn: sqlite3.Connection = Depends(get_conn)):
+    if fmt not in EXPORT_FORMATS:
+        raise HTTPException(400, f"format must be one of {', '.join(EXPORT_FORMATS)}")
+    row = repository.get_report(conn, report_id)
+    if row is None:
+        raise HTTPException(404, "report not found")
+    if row["status"] != "complete" or not row["json_path"]:
+        raise HTTPException(400, "report is not complete")
+    report = json.loads((config.library_dir() / row["json_path"]).read_text())
+
+    media_type, ext = EXPORT_FORMATS[fmt]
+    if fmt == "json":
+        content: bytes = json.dumps(report, indent=2).encode()
+    elif fmt == "md":
+        content = export.to_markdown(report).encode()
+    else:
+        content = export.to_pdf(report)
+    filename = export.export_filename(report, ext)
+    return Response(
+        content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/reports/{report_id}/events")
-async def report_events(request: Request, report_id: str):
-    conn = request.app.state.conn
+async def report_events(request: Request, report_id: str, conn: sqlite3.Connection = Depends(get_conn)):
     bus = request.app.state.bus
     row = repository.get_report(conn, report_id)
     if row is None:
@@ -277,8 +318,7 @@ class DiffRequest(BaseModel):
 
 
 @router.post("/diffs")
-async def create_diff(request: Request, body: DiffRequest):
-    conn = request.app.state.conn
+async def create_diff(request: Request, body: DiffRequest, conn: sqlite3.Connection = Depends(get_conn)):
     if body.from_report_id == body.to_report_id:
         raise HTTPException(400, "cannot compare a report with itself")
     from_row = repository.get_report(conn, body.from_report_id)
@@ -306,15 +346,15 @@ async def create_diff(request: Request, body: DiffRequest):
         prompt_version=prompts.PROMPT_VERSION,
         model=to_row["reasoning_model"],
     )
+    task_conn = db.connect(request.app.state.db_path)
     asyncio.create_task(
-        diffmod.run_diff(row["id"], conn, request.app.state.bus, request.app.state.runtime)
+        diffmod.run_diff(row["id"], task_conn, request.app.state.bus, request.app.state.runtime)
     )
     return {"diff_id": row["id"], "status": "queued"}
 
 
 @router.get("/diffs/{diff_id}")
-def get_diff(request: Request, diff_id: str):
-    conn = request.app.state.conn
+def get_diff(diff_id: str, conn: sqlite3.Connection = Depends(get_conn)):
     row = repository.get_diff(conn, diff_id)
     if row is None:
         raise HTTPException(404, "diff not found")
@@ -362,16 +402,14 @@ class AnnotationPatch(BaseModel):
 
 
 @router.get("/reports/{report_id}/annotations")
-def list_annotations(request: Request, report_id: str):
-    conn = request.app.state.conn
+def list_annotations(report_id: str, conn: sqlite3.Connection = Depends(get_conn)):
     if repository.get_report(conn, report_id) is None:
         raise HTTPException(404, "report not found")
     return {"annotations": [dict(a) for a in repository.list_annotations(conn, report_id)]}
 
 
 @router.post("/reports/{report_id}/annotations", status_code=201)
-def create_annotation(request: Request, report_id: str, body: AnnotationIn):
-    conn = request.app.state.conn
+def create_annotation(report_id: str, body: AnnotationIn, conn: sqlite3.Connection = Depends(get_conn)):
     if repository.get_report(conn, report_id) is None:
         raise HTTPException(404, "report not found")
     if body.status not in ("addressed", "dismissed", "working"):
@@ -381,8 +419,7 @@ def create_annotation(request: Request, report_id: str, body: AnnotationIn):
 
 
 @router.patch("/annotations/{annotation_id}")
-def patch_annotation(request: Request, annotation_id: str, body: AnnotationPatch):
-    conn = request.app.state.conn
+def patch_annotation(annotation_id: str, body: AnnotationPatch, conn: sqlite3.Connection = Depends(get_conn)):
     if body.status is not None and body.status not in ("addressed", "dismissed", "working"):
         raise HTTPException(400, "status must be addressed, dismissed or working")
     try:

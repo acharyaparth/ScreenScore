@@ -89,6 +89,7 @@ def _load_report(row) -> dict:
 
 
 async def run_diff(diff_id: str, conn: sqlite3.Connection, bus: ProgressBus, runtime: ModelRuntime) -> None:
+    """Owns `conn` for the duration of the run and closes it on exit."""
     try:
         row = repository.get_diff(conn, diff_id)
         repository.mark_diff_running(conn, diff_id)
@@ -164,3 +165,5 @@ async def run_diff(diff_id: str, conn: sqlite3.Connection, bus: ProgressBus, run
         except Exception:
             pass
         bus.publish(diff_id, {"type": "failed", "error": str(exc)})
+    finally:
+        conn.close()

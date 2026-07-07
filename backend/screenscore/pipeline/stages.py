@@ -94,6 +94,7 @@ class PipelineContext:
 
 
 async def run_pipeline(report_id: str, conn: sqlite3.Connection, bus: ProgressBus, runtime: ModelRuntime) -> None:
+    """Owns `conn` for the duration of the run and closes it on exit."""
     try:
         ctx = PipelineContext(report_id, conn, bus, runtime)
         repository.mark_report_running(conn, report_id)
@@ -111,6 +112,8 @@ async def run_pipeline(report_id: str, conn: sqlite3.Connection, bus: ProgressBu
         except Exception:
             pass
         bus.publish(report_id, {"type": "failed", "error": str(exc)})
+    finally:
+        conn.close()
 
 
 async def _run(ctx: PipelineContext) -> dict:

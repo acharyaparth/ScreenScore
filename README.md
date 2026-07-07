@@ -15,14 +15,17 @@ ever performs is a model download you explicitly start. That's the whole point:
 writers and producers shouldn't have to upload unreleased IP to anyone's server
 to get a serious read.
 
-> **Status: v2 rewrite in progress — Phases 1–4 complete.** The full analysis
-> pipeline is live (per-scene map pass → eight scored dimensions → synthesis →
-> **citation verification**, with caching and crash resume), and so is the
-> product surface: click any citation to see it highlighted in the script,
-> annotate notes as addressed/dismissed/working, and compare drafts — each
-> draft is **scored blind**, then a separate diff pass reports what improved
-> *and what regressed*. Phase 5 (exports, landing page, polish) is next. See
-> [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
+> **Status: v2 complete (Phases 1–5).** The full analysis pipeline is live
+> (per-scene map pass → eight scored dimensions → synthesis → **citation
+> verification**, with caching and crash resume), along with the product
+> surface (evidence-to-script highlighting, annotations, project history,
+> blind-scored cross-draft diffs) and PDF/Markdown/JSON export. Fast-follows
+> on the roadmap: project export/import bundles and "Ask the script" chat.
+> See [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
+>
+> **Non-technical?** The friendly walkthrough lives on the
+> [landing page](https://acharyaparth.github.io/ScreenScore/) (enable via
+> GitHub Settings → Pages → deploy from `main`, `/docs` folder).
 
 ## Run it
 
@@ -102,12 +105,17 @@ the API is browsable at `http://localhost:8686/api/docs` while running.
 | 2 | Rock-solid parsing: PDF / TXT / Fountain / FDX → structured scenes & characters | ✅ done |
 | 3 | Real pipeline: map → specialists → synthesis, caching/resume, evidence verification | ✅ done |
 | 4 | Report UI with evidence-to-script highlighting; project history; cross-draft diff | ✅ done |
-| 5 | Exports (PDF/MD/JSON), landing page, polish, docs | next |
+| 5 | Exports (PDF/MD/JSON), landing page, polish, docs | ✅ done |
+| — | Fast-follows: project export/import bundle, "Ask the script" chat | planned |
 
 ## Privacy, verifiably
 
 - Analysis makes zero outbound calls — once models are pulled, ScreenScore runs
-  with networking disabled.
+  with networking disabled. Verify it yourself: pull the models, turn off
+  Wi‑Fi (or start the app container with `--network none` pointing at a local
+  Ollama socket), and run a full analysis.
+- The only outbound call in the entire codebase is the user-initiated model
+  pull (`POST /api/models/pull` → your local Ollama, which fetches the model).
 - The bundled Ollama's port is not published outside the Docker network.
 - All state lives in `data/` on your disk. Delete the folder, and it's gone.
 

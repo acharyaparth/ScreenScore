@@ -17,13 +17,18 @@ def now_iso() -> str:
 
 
 def connect(path: Path) -> sqlite3.Connection:
+    """One connection per consumer: each HTTP request opens (and closes) its
+    own via the get_conn dependency, and each pipeline task owns one for its
+    run. A sqlite3 connection must never be shared across threads — FastAPI's
+    sync endpoints run in a threadpool, and shared-connection cursor reuse
+    corrupts with 'bad parameter or other API misuse'. WAL + busy_timeout
+    keep concurrent connections cheap and writers patient."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    # check_same_thread=False: FastAPI serves sync endpoints from a threadpool.
-    # All writes are short and SQLite serializes them; WAL keeps readers unblocked.
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
     return conn
 
 

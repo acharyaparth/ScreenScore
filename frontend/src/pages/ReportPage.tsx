@@ -334,14 +334,26 @@ export default function ReportPage() {
               {report.header.genres.length > 0 && ` · ${report.header.genres.map((g) => g.name).join(', ')}`}
             </p>
           </div>
-          {parse && (
-            <button
-              onClick={() => setScriptOpen(!scriptOpen)}
-              className="shrink-0 rounded border border-stone-300 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
-            >
-              {scriptOpen ? 'Hide script' : 'Show script'}
-            </button>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="text-xs text-stone-400">Export</span>
+            {(['pdf', 'md', 'json'] as const).map((fmt) => (
+              <a
+                key={fmt}
+                href={`/api/reports/${row.id}/export/${fmt}`}
+                className="rounded border border-stone-300 px-2 py-1 text-xs uppercase text-stone-600 hover:bg-stone-100"
+              >
+                {fmt}
+              </a>
+            ))}
+            {parse && (
+              <button
+                onClick={() => setScriptOpen(!scriptOpen)}
+                className="ml-2 rounded border border-stone-300 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+              >
+                {scriptOpen ? 'Hide script' : 'Show script'}
+              </button>
+            )}
+          </div>
         </header>
 
         <div className={`mt-8 rounded-lg border px-6 py-5 ${VERDICT_STYLE[verdict]}`}>
