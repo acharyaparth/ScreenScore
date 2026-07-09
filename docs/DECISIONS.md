@@ -80,6 +80,18 @@ categorical scores, no native app, …) are not repeated here.
 | 41 | Landing page is a **single self-contained `docs/index.html`** served by GitHub Pages (main, `/docs`) | No build step, no dependencies, survives forever; Pages-from-docs keeps the repo root clean. Operator must enable Pages once in repo settings. |
 | 42 | Landing screenshot is a real app screenshot of a **demo-model report on a sample scene, labeled as such**; replace with a full-length real-model report screenshot when one exists | Honest about provenance without blocking the page on a 20-minute real run; the caption says exactly what it is. |
 
+## Post-audit P0 fixes (2026-07-08, from the independent Codex audit)
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| 43 | **Anchored citation matching**: a quote must contain a full parsed line, or cover ≥60% of a single line (≥12 chars); substring presence alone no longer verifies | Audit showed cropped fragments of real lines ("cannot breathe") passed as evidence; trimmed-but-substantial quotes remain legitimate. |
+| 44 | **No silent relocation under ambiguity**: a mis-cited quote is relocated only when exactly one scene matches; multi-scene matches are dropped and counted | Repeated dialogue was being silently attributed to the first matching scene. |
+| 45 | Pipeline parse cache now keys on **PARSER_VERSION** (same as upload); PARSER_VERSION bumped to 2 | Audit found the pipeline read/wrote the parse under PROMPT_VERSION — duplicating parses and immunizing them against parser-upgrade invalidation. |
+| 46 | Sluglines accept **letter-prefixed scene numbers** (A12) alongside 12A | Insert-scene numbering is standard in production shooting scripts; the digit-first regex missed them entirely. |
+| 47 | Compose binds **127.0.0.1:8686** instead of all interfaces | The app holds unreleased scripts; LAN exposure by default violated the project's own don't-expose rule. |
+
+Deferred to the next iteration (P1, tracked): per-dimension targeted retrieval for specialists, generation options in cache keys, local-only runtime URL guard, diff-narrative contradiction check, README parsing-claim softening pending a real-script corpus.
+
 ## Process
 
 - Repo work happens on phase branches (`v2/phase-1`, …) merged to `main` only when

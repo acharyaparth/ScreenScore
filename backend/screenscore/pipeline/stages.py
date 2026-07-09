@@ -117,15 +117,23 @@ async def run_pipeline(report_id: str, conn: sqlite3.Connection, bus: ProgressBu
 
 
 async def _run(ctx: PipelineContext) -> dict:
-    # 1. parse (cached at upload; regenerate if the cache was cleared)
+    # 1. parse (cached at upload; regenerate if the cache was cleared).
+    # NB: the parse cache is keyed by PARSER_VERSION, not PROMPT_VERSION —
+    # the same key the upload path writes — so a parser upgrade re-parses
+    # and a prompt bump does not. (Audit finding: these were once mismatched,
+    # which duplicated parses and would have served stale ones after a
+    # parser upgrade.)
     ctx.stage("parse", "Reading the parsed script", "started")
-    parsed = ctx.cache_get("parse", "-")
+    raw_parse = repository.cache_get(ctx.conn, ctx.script_hash, "parse", "-", PARSER_VERSION)
+    parsed = json.loads(raw_parse) if raw_parse is not None else None
     if parsed is None:
         data = (config.library_dir() / ctx.draft["file_path"]).read_bytes()
         parsed_obj = parse_bytes(data, ctx.draft["source_format"])
         parsed = parsed_obj.as_dict()
         parsed["estimated_page_count"] = parsed_obj.estimated_page_count()
-        ctx.cache_put("parse", "-", parsed)
+        repository.cache_put(
+            ctx.conn, ctx.script_hash, "parse", "-", PARSER_VERSION, json.dumps(parsed)
+        )
     if not parsed["scenes"]:
         raise RuntimeError(
             "The script could not be segmented into scenes, so there is nothing to "

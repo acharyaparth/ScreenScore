@@ -13,7 +13,10 @@ case and curly quotes, and strict about words.
 import re
 from dataclasses import dataclass, field
 
-MIN_QUOTE_CHARS = 8
+MIN_QUOTE_CHARS = 8          # floor for any quote (full-line matches)
+MIN_FRAGMENT_CHARS = 12      # floor for a partial-line quote
+MIN_LINE_COVERAGE = 0.6      # a partial quote must cover ≥60% of its line
+MIN_ANCHOR_LINE_CHARS = 4    # lines shorter than this can't anchor a match
 
 
 @dataclass
@@ -22,14 +25,18 @@ class VerificationStats:
     kept: int = 0
     relocated: int = 0
     dropped: int = 0
+    ambiguous: int = 0  # dropped because the quote appears in multiple scenes
     dimensions_downgraded: list[str] = field(default_factory=list)
     verdict_adjusted: str | None = None
 
     def summary(self) -> str:
-        return (
+        parts = (
             f"{self.checked} citations checked: {self.kept} verified, "
             f"{self.relocated} relocated to the correct scene, {self.dropped} dropped"
         )
+        if self.ambiguous:
+            parts += f" ({self.ambiguous} ambiguous across scenes)"
+        return parts
 
 
 def _normalize(text: str) -> str:
@@ -41,14 +48,38 @@ def _normalize(text: str) -> str:
 
 class EvidenceVerifier:
     def __init__(self, parsed: dict) -> None:
-        self._scene_texts = {
-            scene["number"]: _normalize(scene.get("raw_text") or "")
-            for scene in parsed["scenes"]
-        }
+        self._scene_texts: dict[int, str] = {}
+        self._scene_lines: dict[int, list[str]] = {}
+        for scene in parsed["scenes"]:
+            raw = scene.get("raw_text") or ""
+            self._scene_texts[scene["number"]] = _normalize(raw)
+            self._scene_lines[scene["number"]] = [
+                normalized
+                for line in raw.splitlines()
+                if len(normalized := _normalize(line)) >= MIN_ANCHOR_LINE_CHARS
+            ]
         self.stats = VerificationStats()
 
     def scene_exists(self, number: int) -> bool:
         return number in self._scene_texts
+
+    def _matches_scene(self, quote: str, number: int) -> bool:
+        """Anchored match: substring presence alone is not enough — a quote
+        must contain at least one full line of the scene, or cover most of a
+        single line. This is what stops cropped fragments ('cannot breathe')
+        from passing as citations of longer lines."""
+        if quote not in self._scene_texts.get(number, ""):
+            return False
+        for line in self._scene_lines.get(number, []):
+            if line in quote:
+                return True  # quote spans (at least) one complete line
+            if (
+                quote in line
+                and len(quote) >= MIN_FRAGMENT_CHARS
+                and len(quote) >= MIN_LINE_COVERAGE * len(line)
+            ):
+                return True  # partial quote, but most of that line
+        return False
 
     def check(self, evidence: dict) -> dict | None:
         """Returns the (possibly corrected) evidence item, or None to drop."""
@@ -58,22 +89,28 @@ class EvidenceVerifier:
         if len(quote) < MIN_QUOTE_CHARS:
             self.stats.dropped += 1
             return None
-        if isinstance(scene_number, int) and quote in self._scene_texts.get(scene_number, ""):
-            self.stats.kept += 1
-            return evidence
-        # Look for the quote elsewhere — models often cite the right line
-        # with the wrong number.
-        for number, text in self._scene_texts.items():
-            if quote in text:
-                self.stats.relocated += 1
-                return {
-                    **evidence,
-                    "scene_number": number,
-                    "note": (evidence.get("note") or None)
-                    or f"citation corrected: quote found in scene {number}, not {scene_number}",
-                }
+        if isinstance(scene_number, int) and self._matches_scene(quote, scene_number):
+            return self._kept(evidence)
+        # Models often cite the right line with the wrong number — but only
+        # relocate when the destination is unambiguous. A quote that appears
+        # in several scenes cannot be silently reattributed.
+        matches = [n for n in self._scene_texts if self._matches_scene(quote, n)]
+        if len(matches) == 1:
+            self.stats.relocated += 1
+            return {
+                **evidence,
+                "scene_number": matches[0],
+                "note": (evidence.get("note") or None)
+                or f"citation corrected: quote found in scene {matches[0]}, not {scene_number}",
+            }
+        if len(matches) > 1:
+            self.stats.ambiguous += 1
         self.stats.dropped += 1
         return None
+
+    def _kept(self, evidence: dict) -> dict:
+        self.stats.kept += 1
+        return evidence
 
     def check_list(self, evidence_list: list[dict]) -> list[dict]:
         return [checked for e in evidence_list if (checked := self.check(e)) is not None]
