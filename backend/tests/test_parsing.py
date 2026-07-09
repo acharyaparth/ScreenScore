@@ -150,6 +150,42 @@ def test_messy_transitions(messy):
     )
 
 
+def test_dialogue_heavy_layout_still_finds_the_action_margin():
+    """When dialogue lines outnumber action lines (most real screenplays),
+    the action margin must be the smallest frequent indent, not the mode —
+    regression test for the Big Fish PDF zero-dialogue failure."""
+    text = (
+        "INT. CAMPFIRE - NIGHT\n"
+        "\n"
+        "Edward points at the fire.\n"
+        "\n"
+        "                   EDWARD\n"
+        "         I'd tried everything on it:\n"
+        "         worms, lures, peanut butter. But\n"
+        "         on that day I had a revelation\n"
+        "         about what the fish truly desired.\n"
+        "\n"
+        "                   LITTLE BRAVE\n"
+        "              (confused)\n"
+        "         Your finger?\n"
+        "\n"
+        "Edward slips his ring off.\n"
+        "\n"
+        "                   EDWARD\n"
+        "         Gold. The most desired thing there\n"
+        "         is, and the hardest to let go.\n"
+    )
+    parsed = parse_text(text)
+    chars = {c.name: c for c in parsed.characters()}
+    assert set(chars) == {"EDWARD", "LITTLE BRAVE"}
+    assert chars["EDWARD"].dialogue_line_count == 6
+    assert chars["LITTLE BRAVE"].dialogue_line_count == 1
+    # And the action lines stayed action:
+    actions = [e.text for e in parsed.scenes[0].elements if e.type == ElementType.ACTION]
+    assert "Edward points at the fire." in actions
+    assert "Edward slips his ring off." in actions
+
+
 def test_shooting_script_letter_prefixed_scene_numbers():
     # A12 / 12B insert numbering is standard in production drafts (audit finding).
     text = (

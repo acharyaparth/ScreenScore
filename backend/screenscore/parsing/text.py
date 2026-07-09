@@ -173,6 +173,13 @@ def parse_text(text: str, source_format: str = "txt", page_count: int | None = N
 def _profile_indentation(lines: list[str]) -> tuple[int, int, bool]:
     """Returns (action_indent, dialogue_min_indent, has_layout).
 
+    The action margin is the SMALLEST frequent indent, not the most common
+    one: in dialogue-heavy scripts (i.e., most produced screenplays) the
+    dialogue column has more lines than the action column, and taking the
+    mode silently classified every cue and speech as action — found on the
+    real Big Fish PDF, where the page histogram was action=15 (10 lines) vs
+    dialogue=24 (22 lines).
+
     has_layout is False for flat files (plain exports, some OCR), in which
     case callers use blank-line rules instead of indentation.
     """
@@ -181,8 +188,11 @@ def _profile_indentation(lines: list[str]) -> tuple[int, int, bool]:
     )
     if not indents:
         return 0, 0, False
-    action_indent = indents.most_common(1)[0][0]
+    total = sum(indents.values())
+    floor = max(3, int(total * 0.08))  # ignore one-off headers/page furniture
+    frequent = [indent for indent, count in indents.items() if count >= floor]
+    action_indent = min(frequent) if frequent else indents.most_common(1)[0][0]
     deeper = [ind for ind in indents if ind >= action_indent + 4]
-    has_layout = sum(indents[d] for d in deeper) >= max(3, 0.05 * sum(indents.values()))
+    has_layout = sum(indents[d] for d in deeper) >= max(3, 0.05 * total)
     dialogue_min_indent = action_indent + 4 if has_layout else 0
     return action_indent, dialogue_min_indent, has_layout

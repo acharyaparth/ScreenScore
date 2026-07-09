@@ -150,6 +150,27 @@ def test_no_verifiable_scores_cannot_recommend():
     assert consistent_verdict("recommend", [{"id": "d", "score": None}], stats) == "consider"
 
 
+# -- content similarity (same-script honesty guard) --------------------------
+
+def _parse_with_dialogue(*speeches):
+    return {"scenes": [{
+        "number": 1, "elements": [
+            {"type": "dialogue", "text": s, "character": "A"} for s in speeches
+        ],
+    }]}
+
+
+def test_dialogue_jaccard_identical_and_disjoint():
+    from screenscore.pipeline.diff import dialogue_jaccard
+
+    a = _parse_with_dialogue("We're out of everything that matters.", "Means the sign works.")
+    same = _parse_with_dialogue("We're out of everything that matters.", "Means the sign works.")
+    other = _parse_with_dialogue("Completely different line one here.", "And another different one.")
+    assert dialogue_jaccard(a, same) == 1.0
+    assert dialogue_jaccard(a, other) == 0.0
+    assert dialogue_jaccard(a, {"scenes": []}) is None  # no dialogue → no signal
+
+
 # -- diff narrative consistency ---------------------------------------------
 
 def test_declined_dimensions_are_forced_into_regressions():
