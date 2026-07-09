@@ -123,6 +123,20 @@ async def test_report_reflects_the_script(app, client):
     assert report["recommendation"]["verdict"] in ("pass", "consider", "recommend")
 
 
+def test_comps_never_include_the_script_itself():
+    from screenscore.pipeline.stages import _clean_comps
+
+    comps = _clean_comps(
+        [
+            {"title": "Big Fish (unverified)", "year": 2019, "medium": "film", "reason": "self"},
+            {"title": "The Curious Case of Benjamin Button (unverified)", "year": 2008, "medium": "film", "reason": "tall-tale framing"},
+            {"title": "", "reason": "empty"},
+        ],
+        script_title="Big Fish",
+    )
+    assert [c["title"] for c in comps] == ["The Curious Case of Benjamin Button"]
+
+
 async def test_generation_options_change_busts_cache(app, client, monkeypatch):
     runtime: FakeRuntime = app.state.runtime
     first = await analyze(client)

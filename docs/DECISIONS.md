@@ -90,6 +90,30 @@ categorical scores, no native app, …) are not repeated here.
 | 46 | Sluglines accept **letter-prefixed scene numbers** (A12) alongside 12A | Insert-scene numbering is standard in production shooting scripts; the digit-first regex missed them entirely. |
 | 47 | Compose binds **127.0.0.1:8686** instead of all interfaces | The app holds unreleased scripts; LAN exposure by default violated the project's own don't-expose rule. |
 
+## Full-length validation (2026-07-09)
+
+First feature-length run: **Big Fish** (John August's Fountain release; 192 scenes)
+on the minimum tier (`llama3.1:8b` both roles, 16 GB Apple Silicon):
+
+- **63 minutes end-to-end** — and that was while sharing Ollama with a second
+  concurrent run of the PDF version; solo would be materially faster. Machine
+  stayed responsive throughout (memory cap respected).
+- **Verification worked at scale:** 27 citations checked → 20 verified, 2
+  relocated, 5 fabricated/cropped ones dropped; independent re-check confirmed
+  every surviving citation exists in the source.
+- **Parser cross-validation:** the real 124-page PDF of the same script parsed
+  to exactly the same 192 scenes as the Fountain ground truth.
+- **8B quality profile:** structure/character/production facts grounded and
+  correct (Fantasy/Drama, Edward 38% dialogue share, production-heavy read);
+  interpretive judgments flat (all-fair scoring) and the logline mistakes the
+  emotional spine. Judgment quality is a model-tier + prompt-iteration matter;
+  traceability held.
+- Fixes that came out of the run: comps can no longer include the script
+  itself; disclaimer words scrubbed from comp titles.
+
+**Known follow-up (backlog):** an in-app run queue — two simultaneous analyses
+currently compete for the model silently; the second should visibly queue.
+
 Deferred to the next iteration (P1, tracked): per-dimension targeted retrieval for specialists, generation options in cache keys, local-only runtime URL guard, diff-narrative contradiction check, README parsing-claim softening pending a real-script corpus.
 
 ## Process

@@ -17,6 +17,7 @@ Failure policy:
 import asyncio
 import json
 import os
+import re
 import sqlite3
 import traceback
 from datetime import datetime, timezone
@@ -491,6 +492,28 @@ def _rating_drivers(commercial: dict, scan: dict[str, list[tuple[int, str]]]) ->
     return drivers
 
 
+def _clean_comps(raw: list, script_title: str) -> list[dict]:
+    """Small models sometimes cite the script itself as its own comparable,
+    and copy disclaimer words into titles — scrub both."""
+    def norm(t: str) -> str:
+        return re.sub(r"[^a-z0-9]+", " ", t.lower()).strip()
+
+    comps = []
+    for c in raw:
+        if not isinstance(c, dict) or not c.get("title"):
+            continue
+        title = re.sub(r"\s*\((?:unverified|not verified)\)\s*$", "", str(c["title"]), flags=re.IGNORECASE).strip()
+        if not title or norm(title) == norm(script_title):
+            continue
+        comps.append({
+            "title": title,
+            "year": c.get("year") if isinstance(c.get("year"), int) else None,
+            "medium": c.get("medium") if c.get("medium") in ("film", "tv") else None,
+            "reason": str(c.get("reason") or ""),
+        })
+    return comps[:6]
+
+
 def _verdict(commercial: dict) -> str:
     verdict = ((commercial.get("recommendation") or {}).get("verdict") or "").lower().strip()
     return verdict if verdict in VERDICTS else "consider"
@@ -514,16 +537,7 @@ def _assemble(
         if isinstance(g, dict) and g.get("name")
     ][:3]
 
-    comps = [
-        {
-            "title": str(c["title"]),
-            "year": c.get("year") if isinstance(c.get("year"), int) else None,
-            "medium": c.get("medium") if c.get("medium") in ("film", "tv") else None,
-            "reason": str(c.get("reason") or ""),
-        }
-        for c in (commercial.get("comps") or [])
-        if isinstance(c, dict) and c.get("title")
-    ][:6]
+    comps = _clean_comps(commercial.get("comps") or [], ctx.project["title"])
 
     budget = commercial.get("budget_tier") or {}
     tier = budget.get("tier") if budget.get("tier") in BUDGET_TIERS else "mid"
