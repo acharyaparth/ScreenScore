@@ -14,7 +14,7 @@ from enum import StrEnum
 
 # Bump when parser behavior changes in a way that alters output; part of the
 # pipeline cache key so stale parses are never reused.
-PARSER_VERSION = "1"
+PARSER_VERSION = "2"  # 2: A-prefix scene numbers (A12) recognized in sluglines
 
 # Extensions that decorate a character cue without changing identity.
 CUE_EXTENSIONS = ("V.O.", "O.S.", "O.C.", "CONT'D", "CONT’D", "CONTD", "VOICE", "ON PHONE", "PRE-LAP")

@@ -50,6 +50,56 @@ def test_tiny_quotes_are_dropped():
     assert verifier.check({"scene_number": 1, "quote": "TOM"}) is None
 
 
+# -- anchored matching (audit findings) -------------------------------------
+
+CROPPING = {
+    "scenes": [
+        {"number": 1, "raw_text": "INT. HOUSE - DAY\n\nANA\nI cannot breathe in this house anymore."},
+        {"number": 2, "raw_text": "EXT. YARD - DAY\n\nANA\nYou never listen. Not once in thirty years."},
+    ]
+}
+
+
+def test_cropped_fragment_of_a_line_is_rejected():
+    # 'cannot breathe' is real text but a fragment — it cannot support a score.
+    verifier = EvidenceVerifier(CROPPING)
+    assert verifier.check({"scene_number": 1, "quote": "cannot breathe"}) is None
+    assert verifier.check({"scene_number": 1, "quote": "cannot breathe in this"}) is None
+    assert verifier.stats.dropped == 2
+
+
+def test_most_of_a_line_is_accepted():
+    # ≥60% of the line and ≥12 chars: a legitimate trimmed quote.
+    verifier = EvidenceVerifier(CROPPING)
+    kept = verifier.check({"scene_number": 1, "quote": "cannot breathe in this house anymore."})
+    assert kept is not None
+
+
+def test_full_line_within_longer_quote_is_accepted():
+    # A quote spanning a whole line (plus context) anchors on that line.
+    verifier = EvidenceVerifier(CROPPING)
+    kept = verifier.check(
+        {"scene_number": 2, "quote": "You never listen. Not once in thirty years."}
+    )
+    assert kept is not None
+
+
+def test_quote_in_multiple_scenes_is_not_silently_relocated():
+    duplicated = {
+        "scenes": [
+            {"number": 1, "raw_text": "INT. A - DAY\n\nMARA\nThe sea doesn't forgive, kid."},
+            {"number": 2, "raw_text": "EXT. B - DAY\n\nKEELER\nThe sea doesn't forgive, kid."},
+        ]
+    }
+    verifier = EvidenceVerifier(duplicated)
+    # Cited scene matches → kept as cited, even though scene 2 also matches.
+    assert verifier.check({"scene_number": 1, "quote": "The sea doesn't forgive, kid."}) is not None
+    # Cited scene is wrong and BOTH other scenes match → ambiguous, dropped.
+    result = verifier.check({"scene_number": 99, "quote": "The sea doesn't forgive, kid."})
+    assert result is None
+    assert verifier.stats.ambiguous == 1
+
+
 def test_scored_dimension_with_only_fabricated_evidence_is_downgraded():
     verifier = EvidenceVerifier(PARSED)
     rubric = verifier.verify_rubric([make_dim([{"scene_number": 1, "quote": "Entirely invented line."}])])

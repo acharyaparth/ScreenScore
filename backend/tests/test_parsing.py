@@ -150,6 +150,19 @@ def test_messy_transitions(messy):
     )
 
 
+def test_shooting_script_letter_prefixed_scene_numbers():
+    # A12 / 12B insert numbering is standard in production drafts (audit finding).
+    text = (
+        "A12 INT. LAB - DAY\n\nA scientist works late.\n\n"
+        "12B EXT. ROOF - NIGHT\n\nWind howls over the vents.\n"
+    )
+    parsed = parse_text(text)
+    assert [(s.slugline, s.source_scene_number) for s in parsed.scenes] == [
+        ("INT. LAB - DAY", "A12"),
+        ("EXT. ROOF - NIGHT", "12B"),
+    ]
+
+
 def test_flat_txt_without_indentation_falls_back_to_blank_line_rules():
     flat = (
         "INT. KITCHEN - DAY\n\nTOM\nWe're out of coffee.\n\n"

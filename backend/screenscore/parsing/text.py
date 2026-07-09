@@ -24,10 +24,12 @@ from .models import (
     parse_slugline,
 )
 
+# Scene numbers in shooting scripts: 12, 12A, A12, 12B — letter prefixes mark
+# inserted scenes and are common in production drafts.
 SLUG_RE = re.compile(
-    r"^(?:(?P<pre_num>\d+[A-Z]?)[.)]?\s+)?"
+    r"^(?:(?P<pre_num>[A-Z]?\d+[A-Z]?)[.)]?\s+)?"
     r"(?P<slug>(INT|EXT|EST|I/E|INT\.?\s?/\s?EXT|EXT\.?\s?/\s?INT)[.\s:].*?)"
-    r"(?:\s+(?P<post_num>\d+[A-Z]?))?\s*$",
+    r"(?:\s+(?P<post_num>[A-Z]?\d+[A-Z]?))?\s*$",
     re.IGNORECASE,
 )
 PAGE_NUMBER_RE = re.compile(r"^\s*-?\s*(page\s+)?\d+[A-Za-z]?\s*[-.]?\s*$", re.IGNORECASE)

@@ -15,7 +15,9 @@ services:
   app:
     build: .
     ports:
-      - "8686:8686"
+      # localhost only — this app holds unreleased scripts; never expose it
+      # to the LAN by default.
+      - "127.0.0.1:8686:8686"
     volumes:
       - screenscore-data:/data
     extra_hosts:
