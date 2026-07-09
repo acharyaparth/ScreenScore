@@ -88,6 +88,27 @@ def _load_report(row) -> dict:
     return json.loads((config.library_dir() / row["json_path"]).read_text())
 
 
+def _enforce_narrative_consistency(changes: list[dict], narrative: dict) -> None:
+    """The mechanical score table is authoritative: any dimension that
+    measurably declined must appear in regressions (and improved likewise),
+    even if the model's narrative glossed over it. Entries added here are
+    labeled as computed so the UI/user can tell them apart."""
+    def mentioned(dim: dict, items: list[str]) -> bool:
+        needles = (dim["id"], dim["name"].lower())
+        return any(n in item.lower() for item in items for n in needles)
+
+    for change in changes:
+        line = (
+            f"{change['name']}: score moved "
+            f"{(change['from_score'] or 'insufficient')} → {(change['to_score'] or 'insufficient')} "
+            "(added from the computed score table)"
+        )
+        if change["direction"] == "declined" and not mentioned(change, narrative["regressions"]):
+            narrative["regressions"].append(line)
+        if change["direction"] == "improved" and not mentioned(change, narrative["improved"]):
+            narrative["improved"].append(line)
+
+
 async def run_diff(diff_id: str, conn: sqlite3.Connection, bus: ProgressBus, runtime: ModelRuntime) -> None:
     """Owns `conn` for the duration of the run and closes it on exit."""
     try:
@@ -139,20 +160,22 @@ async def run_diff(diff_id: str, conn: sqlite3.Connection, bus: ProgressBus, run
             }
 
         known_ids = {c["id"] for c in changes}
+        narrative_block = {
+            "overall": str(narrative.get("overall") or "").strip(),
+            "dimension_comments": [
+                {"id": c["id"], "comment": str(c.get("comment") or "")}
+                for c in (narrative.get("dimension_comments") or [])
+                if isinstance(c, dict) and c.get("id") in known_ids
+            ],
+            "improved": [str(x) for x in narrative.get("improved") or []],
+            "persisted": [str(x) for x in narrative.get("persisted") or []],
+            "new_issues": [str(x) for x in narrative.get("new_issues") or []],
+            "regressions": [str(x) for x in narrative.get("regressions") or []],
+        }
+        _enforce_narrative_consistency(changes, narrative_block)
         payload = {
             "mechanical": mechanical,
-            "narrative": {
-                "overall": str(narrative.get("overall") or "").strip(),
-                "dimension_comments": [
-                    {"id": c["id"], "comment": str(c.get("comment") or "")}
-                    for c in (narrative.get("dimension_comments") or [])
-                    if isinstance(c, dict) and c.get("id") in known_ids
-                ],
-                "improved": [str(x) for x in narrative.get("improved") or []],
-                "persisted": [str(x) for x in narrative.get("persisted") or []],
-                "new_issues": [str(x) for x in narrative.get("new_issues") or []],
-                "regressions": [str(x) for x in narrative.get("regressions") or []],
-            },
+            "narrative": narrative_block,
             "from_report_id": row["from_report_id"],
             "to_report_id": row["to_report_id"],
         }
