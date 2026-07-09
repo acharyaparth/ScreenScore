@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 from string import Template
 
-PROMPT_VERSION = "1.0"
+PROMPT_VERSION = "1.1"  # 1.1: specialists receive per-dimension retrieval packs
 
 _DIR = Path(__file__).parent
 

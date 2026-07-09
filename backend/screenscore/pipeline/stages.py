@@ -27,7 +27,7 @@ from ..parsing import PARSER_VERSION, parse_bytes
 from ..runtime.base import ModelRuntime
 from ..schemas import validate_report
 from . import digest as dg
-from . import prompts
+from . import prompts, retrieval
 from .llmjson import StageOutputError, generate_json
 from .progress import ProgressBus
 from .verify import EvidenceVerifier, consistent_verdict
@@ -48,7 +48,6 @@ BUDGET_TIERS = {"micro", "low", "mid", "studio", "tentpole"}
 RATING_CATEGORIES = {"language", "violence", "sexual_content", "substances", "thematic"}
 VERDICTS = {"pass", "consider", "recommend"}
 
-DIGEST_MAX_CHARS = 20000
 SCENE_TEXT_MAX_CHARS = 6000
 
 WORKER_OPTS = {"temperature": 0.2, "num_ctx": 4096}
@@ -58,6 +57,15 @@ COMPS_DISCLAIMER = (
     "Comparable titles are model-suggested from its own knowledge and are not "
     "verified against any external source."
 )
+
+
+def _options_tag(options: dict | None) -> str:
+    if not options:
+        return ""
+    import hashlib
+
+    blob = json.dumps(options, sort_keys=True)
+    return "@" + hashlib.md5(blob.encode()).hexdigest()[:8]
 
 
 class PipelineContext:
@@ -74,13 +82,18 @@ class PipelineContext:
         self.script_hash = self.draft["content_hash"]
 
     # -- cache ------------------------------------------------------------
-    def cache_get(self, stage: str, model: str) -> dict | None:
-        raw = repository.cache_get(self.conn, self.script_hash, stage, model, prompts.PROMPT_VERSION)
+    # Generation options are part of cache identity (audit finding): the same
+    # prompt at a different num_ctx/temperature is a different computation.
+    def cache_get(self, stage: str, model: str, options: dict | None = None) -> dict | None:
+        raw = repository.cache_get(
+            self.conn, self.script_hash, stage, model + _options_tag(options), prompts.PROMPT_VERSION
+        )
         return json.loads(raw) if raw is not None else None
 
-    def cache_put(self, stage: str, model: str, payload: dict) -> None:
+    def cache_put(self, stage: str, model: str, payload: dict, options: dict | None = None) -> None:
         repository.cache_put(
-            self.conn, self.script_hash, stage, model, prompts.PROMPT_VERSION, json.dumps(payload)
+            self.conn, self.script_hash, stage, model + _options_tag(options),
+            prompts.PROMPT_VERSION, json.dumps(payload),
         )
 
     # -- progress ----------------------------------------------------------
@@ -155,9 +168,14 @@ async def _run(ctx: PipelineContext) -> dict:
     scene_maps = await _map_pass(ctx, parsed)
     ctx.stage("map", "Summarizing scenes", "completed")
 
-    digest = dg.digest_text(parsed, scene_maps, DIGEST_MAX_CHARS)
-    character_data = dg.character_data_text(parsed)
-    excerpts = dg.excerpts_text(parsed, structure)
+    # Character budgets derived from the actual context window so prompts
+    # never overflow (the runtime front-truncates silently, which would eat
+    # the instructions — worse than a shorter digest).
+    budget = retrieval.char_budget(REASONING_OPTS["num_ctx"])
+    digest = dg.digest_text(parsed, scene_maps, int(budget * 0.5))
+    character_data = dg.character_data_text(parsed, int(budget * 0.12))
+    excerpts = dg.excerpts_text(parsed, structure, per_excerpt_chars=max(600, int(budget * 0.15) // 4))
+    dim_context_budget = int(budget * 0.2)
 
     # 4. character breakdowns
     ctx.stage("characters", "Writing character breakdowns", "started")
@@ -166,7 +184,9 @@ async def _run(ctx: PipelineContext) -> dict:
 
     # 5. dimension specialists
     ctx.stage("score", "Scoring rubric dimensions", "started")
-    rubric = await _specialists(ctx, structure, digest, character_data, excerpts)
+    rubric = await _specialists(
+        ctx, parsed, structure, digest, character_data, excerpts, dim_context_budget
+    )
     ctx.stage("score", "Scoring rubric dimensions", "completed")
 
     # 6. scene notes
@@ -197,7 +217,9 @@ async def _run(ctx: PipelineContext) -> dict:
     verifier = EvidenceVerifier(parsed)
     rubric = verifier.verify_rubric(rubric)
     scene_notes = verifier.verify_scene_notes(scene_notes)
-    rating_drivers = verifier.verify_rating_drivers(_rating_drivers(commercial))
+    rating_drivers = verifier.verify_rating_drivers(
+        _rating_drivers(commercial, retrieval.content_scan(parsed))
+    )
     verdict = consistent_verdict(_verdict(commercial), rubric, verifier.stats)
     ctx.stage("verify", "Verifying citations against the script", "completed",
               detail=verifier.stats.summary())
@@ -249,7 +271,7 @@ async def _map_pass(ctx: PipelineContext, parsed: dict) -> dict[int, dict]:
     async def one(scene: dict) -> None:
         nonlocal done_count
         stage_key = f"map:{scene['number']:04d}"
-        cached = ctx.cache_get(stage_key, ctx.worker_model)
+        cached = ctx.cache_get(stage_key, ctx.worker_model, options=WORKER_OPTS)
         if cached is None:
             prompt = prompts.render(
                 "map",
@@ -264,7 +286,7 @@ async def _map_pass(ctx: PipelineContext, parsed: dict) -> dict[int, dict]:
                 # Fallback: a degraded but usable digest entry; never kill a
                 # long run over one scene.
                 cached = {"summary": _fallback_summary(scene), "tone": [], "notable_lines": []}
-            ctx.cache_put(stage_key, ctx.worker_model, cached)
+            ctx.cache_put(stage_key, ctx.worker_model, cached, options=WORKER_OPTS)
         results[scene["number"]] = cached
         done_count += 1
         ctx.tick("map", f"scene {done_count}/{len(scenes)}")
@@ -298,14 +320,14 @@ async def _characters(ctx: PipelineContext, parsed: dict, digest: str, character
     }
     if not principals:
         return section
-    payload = ctx.cache_get("characters", ctx.reasoning_model)
+    payload = ctx.cache_get("characters", ctx.reasoning_model, options=REASONING_OPTS)
     if payload is None:
         prompt = prompts.render("characters", digest=digest, character_data=character_data)
         try:
             payload = await generate_json(ctx.runtime, ctx.reasoning_model, prompt, options=REASONING_OPTS)
         except StageOutputError:
             payload = {"characters": []}
-        ctx.cache_put("characters", ctx.reasoning_model, payload)
+        ctx.cache_put("characters", ctx.reasoning_model, payload, options=REASONING_OPTS)
     described = {c.get("name", ""): c for c in payload.get("characters", []) if isinstance(c, dict)}
     for principal in section["principals"]:
         match = described.get(principal["name"], {})
@@ -344,14 +366,18 @@ def _character_stats(parsed: dict) -> dict:
 
 
 async def _specialists(
-    ctx: PipelineContext, structure, digest: str, character_data: str, excerpts: str
+    ctx: PipelineContext, parsed: dict, structure, digest: str,
+    character_data: str, excerpts: str, dim_context_budget: int,
 ) -> list[dict]:
     rubric = []
     for index, (dim_id, dim_name) in enumerate(DIMENSIONS, start=1):
         ctx.tick("score", f"{dim_name} ({index}/{len(DIMENSIONS)})")
         stage_key = f"dim:{dim_id}"
-        payload = ctx.cache_get(stage_key, ctx.reasoning_model)
+        payload = ctx.cache_get(stage_key, ctx.reasoning_model, options=REASONING_OPTS)
         if payload is None:
+            dimension_context = retrieval.dimension_context(
+                dim_id, parsed, structure, dim_context_budget
+            )
             prompt = prompts.render(
                 "specialist",
                 dimension_name=dim_name,
@@ -360,6 +386,7 @@ async def _specialists(
                 digest=digest,
                 character_data=character_data,
                 excerpts=excerpts,
+                dimension_context=dimension_context or "(none for this dimension)",
             )
             try:
                 payload = await generate_json(ctx.runtime, ctx.reasoning_model, prompt, options=REASONING_OPTS)
@@ -370,7 +397,7 @@ async def _specialists(
                     "rationale": f"The analysis model did not produce a usable result for this dimension ({exc}).",
                     "evidence": [],
                 }
-            ctx.cache_put(stage_key, ctx.reasoning_model, payload)
+            ctx.cache_put(stage_key, ctx.reasoning_model, payload, options=REASONING_OPTS)
         rubric.append(_clean_dimension(dim_id, dim_name, payload))
     return rubric
 
@@ -395,14 +422,14 @@ def _clean_dimension(dim_id: str, dim_name: str, payload: dict) -> dict:
 
 
 async def _scene_notes(ctx: PipelineContext, structure, digest: str) -> list[dict]:
-    payload = ctx.cache_get("notes", ctx.reasoning_model)
+    payload = ctx.cache_get("notes", ctx.reasoning_model, options=REASONING_OPTS)
     if payload is None:
         prompt = prompts.render("notes", structure_line=structure.line(), digest=digest)
         try:
             payload = await generate_json(ctx.runtime, ctx.reasoning_model, prompt, options=REASONING_OPTS)
         except StageOutputError:
             payload = {"notes": []}
-        ctx.cache_put("notes", ctx.reasoning_model, payload)
+        ctx.cache_put("notes", ctx.reasoning_model, payload, options=REASONING_OPTS)
     notes = []
     for note in payload.get("notes", []):
         if not isinstance(note, dict) or not isinstance(note.get("scene_number"), int):
@@ -427,10 +454,10 @@ async def _scene_notes(ctx: PipelineContext, structure, digest: str) -> list[dic
 
 
 async def _cached_json(ctx: PipelineContext, stage: str, model: str, prompt: str) -> dict:
-    payload = ctx.cache_get(stage, model)
+    payload = ctx.cache_get(stage, model, options=REASONING_OPTS)
     if payload is None:
         payload = await generate_json(ctx.runtime, model, prompt, options=REASONING_OPTS)
-        ctx.cache_put(stage, model, payload)
+        ctx.cache_put(stage, model, payload, options=REASONING_OPTS)
     return payload
 
 
@@ -442,7 +469,9 @@ def _rubric_summary(rubric: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _rating_drivers(commercial: dict) -> list[dict]:
+def _rating_drivers(commercial: dict, scan: dict[str, list[tuple[int, str]]]) -> list[dict]:
+    """Model-named drivers, grounded with verbatim lines from the content scan
+    so rating claims are citable like everything else."""
     drivers = []
     for driver in (commercial.get("content_rating") or {}).get("drivers", []):
         if not isinstance(driver, dict):
@@ -450,10 +479,14 @@ def _rating_drivers(commercial: dict) -> list[dict]:
         category = driver.get("category")
         if category not in RATING_CATEGORIES:
             continue
+        evidence = [
+            {"scene_number": scene_number, "quote": line, "note": None}
+            for scene_number, line in scan.get(category, [])[:2]
+        ]
         drivers.append({
             "category": category,
             "detail": str(driver.get("detail") or "").strip() or "(unspecified)",
-            "evidence": [],
+            "evidence": evidence,
         })
     return drivers
 

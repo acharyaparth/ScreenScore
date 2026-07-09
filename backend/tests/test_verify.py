@@ -148,3 +148,22 @@ def test_consistent_verdicts_untouched():
 def test_no_verifiable_scores_cannot_recommend():
     stats = VerificationStats()
     assert consistent_verdict("recommend", [{"id": "d", "score": None}], stats) == "consider"
+
+
+# -- diff narrative consistency ---------------------------------------------
+
+def test_declined_dimensions_are_forced_into_regressions():
+    from screenscore.pipeline.diff import _enforce_narrative_consistency
+
+    changes = [
+        {"id": "dialogue", "name": "Dialogue", "from_score": "good", "to_score": "weak", "direction": "declined"},
+        {"id": "structure_pacing", "name": "Structure & Pacing", "from_score": "fair", "to_score": "good", "direction": "improved"},
+        {"id": "theme_resonance", "name": "Theme", "from_score": "fair", "to_score": "fair", "direction": "unchanged"},
+    ]
+    narrative = {"regressions": [], "improved": ["Structure & Pacing is tighter now."],
+                 "persisted": [], "new_issues": [], "overall": "", "dimension_comments": []}
+    _enforce_narrative_consistency(changes, narrative)
+    # The glossed-over decline is added from the computed table…
+    assert any("Dialogue" in r and "computed score table" in r for r in narrative["regressions"])
+    # …but the already-mentioned improvement is not duplicated.
+    assert len(narrative["improved"]) == 1

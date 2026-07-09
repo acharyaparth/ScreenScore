@@ -14,6 +14,9 @@ $character_data
 Verbatim excerpts from the script:
 $excerpts
 
+Material selected specifically for this dimension (quoted lines are verbatim):
+$dimension_context
+
 Return ONLY valid JSON, no other text:
 {"score": "weak" | "fair" | "good" | "excellent", "insufficient_evidence": false, "rationale": "3-6 sentences of specific, professional coverage analysis of THIS script", "evidence": [{"scene_number": 12, "quote": "a line copied VERBATIM from the digest's quoted lines or the excerpts"}]}
 

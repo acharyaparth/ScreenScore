@@ -102,7 +102,7 @@ the API is browsable at `http://localhost:8686/api/docs` while running.
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 1 | Skeleton & contracts: Docker one-liner, hardware-aware model recommendation, report + persistence schemas, stubbed end-to-end run | ✅ done |
-| 2 | Rock-solid parsing: PDF / TXT / Fountain / FDX → structured scenes & characters | ✅ done |
+| 2 | Parsing: PDF / TXT / Fountain / FDX → structured scenes & characters (tested against a synthetic messy corpus; hardening against real-world production scripts is ongoing) | ✅ done |
 | 3 | Real pipeline: map → specialists → synthesis, caching/resume, evidence verification | ✅ done |
 | 4 | Report UI with evidence-to-script highlighting; project history; cross-draft diff | ✅ done |
 | 5 | Exports (PDF/MD/JSON), landing page, polish, docs | ✅ done |

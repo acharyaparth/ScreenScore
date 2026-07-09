@@ -123,6 +123,23 @@ async def test_report_reflects_the_script(app, client):
     assert report["recommendation"]["verdict"] in ("pass", "consider", "recommend")
 
 
+async def test_generation_options_change_busts_cache(app, client, monkeypatch):
+    runtime: FakeRuntime = app.state.runtime
+    first = await analyze(client)
+    await wait_done(client, first["report_id"])
+    calls_after_first = runtime.generate_calls
+
+    from screenscore.pipeline import stages
+    monkeypatch.setitem(stages.REASONING_OPTS, "num_ctx", 4096)
+
+    second = await analyze(client, project_id=first["project_id"])
+    body2 = await wait_done(client, second["report_id"])
+    assert body2["status"] == "complete"
+    # Reasoning-stage caches miss (different options); map cache still hits.
+    assert runtime.generate_calls > calls_after_first
+    assert runtime.history.count("map") == 3  # unchanged worker options reused
+
+
 async def test_prompt_version_changes_bust_cache(app, client, monkeypatch):
     runtime: FakeRuntime = app.state.runtime
     first = await analyze(client)
