@@ -160,15 +160,32 @@ def _parse_with_dialogue(*speeches):
     }]}
 
 
-def test_dialogue_jaccard_identical_and_disjoint():
-    from screenscore.pipeline.diff import dialogue_jaccard
+def test_dialogue_similarity_identical_and_disjoint():
+    from screenscore.pipeline.diff import dialogue_similarity
 
-    a = _parse_with_dialogue("We're out of everything that matters.", "Means the sign works.")
-    same = _parse_with_dialogue("We're out of everything that matters.", "Means the sign works.")
-    other = _parse_with_dialogue("Completely different line one here.", "And another different one.")
-    assert dialogue_jaccard(a, same) == 1.0
-    assert dialogue_jaccard(a, other) == 0.0
-    assert dialogue_jaccard(a, {"scenes": []}) is None  # no dialogue → no signal
+    a = _parse_with_dialogue("We're out of everything that matters, and I mean everything today.")
+    same = _parse_with_dialogue("We're out of everything that matters, and I mean everything today.")
+    other = _parse_with_dialogue("Completely different words spoken by completely different people entirely.")
+    assert dialogue_similarity(a, same) == 1.0
+    assert dialogue_similarity(a, other) == 0.0
+    assert dialogue_similarity(a, {"scenes": []}) is None  # no dialogue → no signal
+
+
+def test_dialogue_similarity_is_wrapping_invariant():
+    """The same speech split across different line widths (Fountain vs PDF
+    extraction) must still measure as identical — regression test for the
+    live 9%-similarity failure on the same script in two formats."""
+    from screenscore.pipeline.diff import dialogue_similarity
+
+    fountain = _parse_with_dialogue(
+        "Everyone said the lighthouse was automated and nobody said why it wasn't."
+    )
+    pdf_wrapped = _parse_with_dialogue(
+        "Everyone said the lighthouse was",
+        "automated and nobody said why it",
+        "wasn't.",
+    )
+    assert dialogue_similarity(fountain, pdf_wrapped) == 1.0
 
 
 # -- diff narrative consistency ---------------------------------------------

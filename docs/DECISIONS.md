@@ -114,6 +114,21 @@ on the minimum tier (`llama3.1:8b` both roles, 16 GB Apple Silicon):
 **Known follow-up (backlog):** an in-app run queue — two simultaneous analyses
 currently compete for the model silently; the second should visibly queue.
 
+### Cross-draft honesty hardening (from the validation, 2026-07-10)
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| 48 | Draft similarity = **Jaccard over word 5-gram shingles of concatenated dialogue**, with curly→straight quote normalization before tokenizing | Line-level comparison measured 9% for the same script in two formats (PDF wraps speeches differently); un-normalized apostrophes alone cost 30 points (0.42→0.71 on the real pair). Wrapping-invariant by construction, regression-tested. |
+| 49 | **≥90% overlap skips the narrative model entirely** — a deterministic "no revision to narrate" replaces it; below that, the computed overlap is shown to the model with an instruction not to invent revision arcs the numbers don't support. Diff prompt versions independently (DIFF_PROMPT_VERSION) so comparison-prompt changes never invalidate pipeline caches | Asked for a revision story on identical text, the model wrote one — twice. Don't ask the question when arithmetic already knows the answer. |
+| 50 | Known limitation, accepted: the same script as Fountain vs PDF measures ~0.71 (not ≥0.9) because the PDF parse still loses ~13% of dialogue to page-broken speeches — so cross-format same-script pairs get a tempered model narrative, not the deterministic skip. Root cause is a parser backlog item (page-boundary dialogue continuation), not the similarity measure | The guard's real job is same-format re-uploads (a writer's normal loop), where it works; fixing the parse loss is the durable cure for the cross-format case. |
+
+**Full-length validation, final state:** identical scores on all 8 dimensions
+and identical verdicts across two independent full runs of the same script in
+two formats (fresh caches; 31 and 30 minutes solo on the minimum tier). With
+the overlap in-prompt, the comparison narrative dropped from an invented
+revision arc to "little change in overall quality … minor tweaks" against a
+computed all-unchanged score table.
+
 Deferred to the next iteration (P1, tracked): per-dimension targeted retrieval for specialists, generation options in cache keys, local-only runtime URL guard, diff-narrative contradiction check, README parsing-claim softening pending a real-script corpus.
 
 ## Process

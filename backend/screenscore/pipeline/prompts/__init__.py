@@ -15,6 +15,11 @@ from string import Template
 
 PROMPT_VERSION = "1.1"  # 1.1: specialists receive per-dimension retrieval packs
 
+# The diff prompt versions independently: it caches nothing downstream, and
+# bumping the pipeline PROMPT_VERSION would needlessly invalidate every
+# map/specialist cache when only the comparison prompt changed.
+DIFF_PROMPT_VERSION = "1.1"  # 1.1: computed dialogue overlap shown to the model
+
 _DIR = Path(__file__).parent
 
 

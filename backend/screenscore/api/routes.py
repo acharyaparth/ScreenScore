@@ -368,7 +368,7 @@ async def create_diff(request: Request, body: DiffRequest, conn: sqlite3.Connect
     if from_draft["project_id"] != to_draft["project_id"]:
         raise HTTPException(400, "reports belong to different projects")
 
-    existing = repository.find_diff(conn, body.from_report_id, body.to_report_id, prompts.PROMPT_VERSION)
+    existing = repository.find_diff(conn, body.from_report_id, body.to_report_id, prompts.DIFF_PROMPT_VERSION)
     if existing is not None:
         if existing["status"] != "failed":
             return {"diff_id": existing["id"], "status": existing["status"]}
@@ -379,7 +379,7 @@ async def create_diff(request: Request, body: DiffRequest, conn: sqlite3.Connect
         project_id=to_draft["project_id"],
         from_report_id=body.from_report_id,
         to_report_id=body.to_report_id,
-        prompt_version=prompts.PROMPT_VERSION,
+        prompt_version=prompts.DIFF_PROMPT_VERSION,
         model=to_row["reasoning_model"],
     )
     task_conn = db.connect(request.app.state.db_path)

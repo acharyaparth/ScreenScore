@@ -32,18 +32,28 @@ SCORE_RANK = {None: None, "weak": 0, "fair": 1, "good": 2, "excellent": 3}
 NEAR_IDENTICAL_JACCARD = 0.9
 
 
-def dialogue_jaccard(parse_a: dict, parse_b: dict) -> float | None:
-    """Format-stable content similarity: overlap of normalized dialogue lines.
-    (Raw text is too lossy across PDF extraction; dialogue survives.)"""
-    def lines(parse: dict) -> set[str]:
-        out = set()
+SHINGLE_SIZE = 5
+
+
+def dialogue_similarity(parse_a: dict, parse_b: dict) -> float | None:
+    """Format-stable content similarity: Jaccard over word 5-gram shingles of
+    the concatenated dialogue. Wrapping-invariant by construction — PDFs break
+    the same speech into different lines than Fountain does, so any line-level
+    comparison collapses to near zero on identical text (found live when the
+    same script in two formats measured 9% 'similar')."""
+    def shingles(parse: dict) -> set[tuple[str, ...]]:
+        words: list[str] = []
         for scene in parse.get("scenes", []):
             for element in scene["elements"]:
-                if element["type"] == "dialogue" and len(element.get("text") or "") > 10:
-                    out.add(re.sub(r"\s+", " ", element["text"].lower()).strip())
-        return out
+                if element["type"] == "dialogue" and element.get("text"):
+                    # Curly→straight quotes before tokenizing: PDFs typeset
+                    # apostrophes as U+2019 and every contraction would
+                    # tokenize differently (the same lesson verify.py learned).
+                    text = element["text"].lower().replace("’", "'").replace("‘", "'")
+                    words += re.findall(r"[a-z0-9']+", text)
+        return {tuple(words[i : i + SHINGLE_SIZE]) for i in range(len(words) - SHINGLE_SIZE + 1)}
 
-    a, b = lines(parse_a), lines(parse_b)
+    a, b = shingles(parse_a), shingles(parse_b)
     if not a or not b:
         return None
     return len(a & b) / len(a | b)
@@ -122,7 +132,7 @@ def _draft_similarity(conn: sqlite3.Connection, from_row, to_row) -> float | Non
         if raw is None:
             return None
         parses.append(json.loads(raw))
-    return dialogue_jaccard(parses[0], parses[1])
+    return dialogue_similarity(parses[0], parses[1])
 
 
 def _enforce_narrative_consistency(changes: list[dict], narrative: dict) -> None:
@@ -176,27 +186,50 @@ async def run_diff(diff_id: str, conn: sqlite3.Connection, bus: ProgressBus, run
             "content_similarity": round(similarity, 3) if similarity is not None else None,
         }
 
-        from_label = from_report["header"].get("draft_label") or f"draft of {from_row['created_at'][:10]}"
-        to_label = to_report["header"].get("draft_label") or f"draft of {to_row['created_at'][:10]}"
-        prompt = prompts.render(
-            "diff",
-            title=project["title"],
-            from_label=from_label,
-            to_label=to_label,
-            from_summary=_report_summary(from_report),
-            to_summary=_report_summary(to_report),
-            score_changes=_score_changes_text(changes),
-            from_notes=_notes_summary(from_report),
-            to_notes=_notes_summary(to_report),
-        )
-        try:
-            narrative = await generate_json(runtime, row["model"], prompt, options=REASONING_OPTS)
-        except StageOutputError as exc:
+        if similarity is not None and similarity >= NEAR_IDENTICAL_JACCARD:
+            # Same text in two files: there is no revision story to ask a
+            # model for. Asking anyway yields confabulated "the revision
+            # improved/weakened…" prose — observed live. Say the truth
+            # deterministically instead.
             narrative = {
-                "overall": f"(The comparison model did not produce a usable narrative: {exc})",
+                "overall": (
+                    f"These two drafts are textually near-identical "
+                    f"({similarity:.0%} dialogue overlap) — likely the same script in "
+                    "different files. There is no revision to narrate; any score "
+                    "differences reflect run-to-run model variance, not changes to "
+                    "the script."
+                ),
                 "dimension_comments": [], "improved": [], "persisted": [],
                 "new_issues": [], "regressions": [],
             }
+        else:
+            from_label = from_report["header"].get("draft_label") or f"draft of {from_row['created_at'][:10]}"
+            to_label = to_report["header"].get("draft_label") or f"draft of {to_row['created_at'][:10]}"
+            similarity_line = (
+                f"{similarity:.0%} of dialogue is shared between the drafts."
+                if similarity is not None
+                else "not measurable for these drafts."
+            )
+            prompt = prompts.render(
+                "diff",
+                title=project["title"],
+                from_label=from_label,
+                to_label=to_label,
+                similarity_line=similarity_line,
+                from_summary=_report_summary(from_report),
+                to_summary=_report_summary(to_report),
+                score_changes=_score_changes_text(changes),
+                from_notes=_notes_summary(from_report),
+                to_notes=_notes_summary(to_report),
+            )
+            try:
+                narrative = await generate_json(runtime, row["model"], prompt, options=REASONING_OPTS)
+            except StageOutputError as exc:
+                narrative = {
+                    "overall": f"(The comparison model did not produce a usable narrative: {exc})",
+                    "dimension_comments": [], "improved": [], "persisted": [],
+                    "new_issues": [], "regressions": [],
+                }
 
         known_ids = {c["id"] for c in changes}
         narrative_block = {
@@ -212,13 +245,6 @@ async def run_diff(diff_id: str, conn: sqlite3.Connection, bus: ProgressBus, run
             "regressions": [str(x) for x in narrative.get("regressions") or []],
         }
         _enforce_narrative_consistency(changes, narrative_block)
-        if similarity is not None and similarity >= NEAR_IDENTICAL_JACCARD:
-            narrative_block["overall"] = (
-                f"Note: these two drafts are textually near-identical "
-                f"({similarity:.0%} dialogue overlap). Any score differences below "
-                "reflect run-to-run model variance, not actual revisions. "
-                + narrative_block["overall"]
-            )
         payload = {
             "mechanical": mechanical,
             "narrative": narrative_block,
