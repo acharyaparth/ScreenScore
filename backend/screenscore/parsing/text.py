@@ -34,6 +34,9 @@ SLUG_RE = re.compile(
 )
 PAGE_NUMBER_RE = re.compile(r"^\s*-?\s*(page\s+)?\d+[A-Za-z]?\s*[-.]?\s*$", re.IGNORECASE)
 FURNITURE_RE = re.compile(r"^\s*\(?\s*(CONTINUED|MORE)\s*\)?\s*[:.]?\s*$", re.IGNORECASE)
+# Running page headers in production PDFs: "BIG FISH - FINAL   53." —
+# an uppercase title ending in a page number. Sluglines never end in "N.".
+PAGE_HEADER_RE = re.compile(r"^\s*[A-Z][A-Z0-9 .,:'\"\-]*\s\d+[A-Z]?\.\s*$")
 KNOWN_TRANSITIONS = re.compile(
     r"^(FADE (IN|OUT|TO BLACK)|CUT TO BLACK|(SMASH |MATCH |HARD |JUMP )?CUT TO|DISSOLVE TO|"
     r"WIPE TO|IRIS (IN|OUT)|TIME CUT|INTERCUT( WITH)?)\s*[:.]?$"
@@ -54,15 +57,30 @@ def _is_transition(stripped: str) -> bool:
     )
 
 
+def _cue_base(stripped: str) -> str:
+    """The name part of a cue: trailing parentheticals and the dual-dialogue
+    marker removed. Extensions may be any case — production PDFs write
+    'EDWARD (cont'd)' in lowercase, and requiring the whole line uppercase
+    silently dropped every continued speech (the Big Fish PDF lost ~18% of
+    its dialogue words this way)."""
+    base = stripped.rstrip("^").strip()
+    while base.endswith(")") and "(" in base:
+        base = base[: base.rindex("(")].strip()
+    return base
+
+
 def _looks_like_cue(stripped: str) -> bool:
-    if not _is_upper(stripped) or len(stripped) > 45:
+    if len(stripped) > 45:
+        return False
+    base = _cue_base(stripped)
+    if not base or not _is_upper(base):
         return False
     if SLUG_RE.match(stripped) or _is_transition(stripped):
         return False
-    if stripped.endswith(("!", "?", ":")):
+    if base.endswith(("!", "?", ":")):
         return False  # shouty action ("BANG!") or heading, not a name
-    if stripped.endswith(".") and not stripped.endswith((".)", "'D.")):
-        return False
+    if base.endswith(".") and len(base) <= 4:
+        return False  # stray abbreviations
     return True
 
 
@@ -71,7 +89,9 @@ def parse_text(text: str, source_format: str = "txt", page_count: int | None = N
     lines = [
         line
         for line in text.split("\n")
-        if not PAGE_NUMBER_RE.match(line) and not FURNITURE_RE.match(line)
+        if not PAGE_NUMBER_RE.match(line)
+        and not FURNITURE_RE.match(line)
+        and not (PAGE_HEADER_RE.match(line) and not SLUG_RE.match(line.strip()))
     ]
 
     result = ParsedScreenplay(

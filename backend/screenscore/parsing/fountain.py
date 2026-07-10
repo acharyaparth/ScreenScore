@@ -41,7 +41,12 @@ def _looks_like_cue(line: str) -> bool:
     stripped = line.strip()
     if stripped.startswith("@"):
         return True
-    if not _is_upper(stripped):
+    # Only the NAME must be uppercase; extensions like (cont'd) may be
+    # lowercase in real files (same lesson as the text parser).
+    base = stripped.rstrip("^").strip()
+    while base.endswith(")") and "(" in base:
+        base = base[: base.rindex("(")].strip()
+    if not base or not _is_upper(base):
         return False
     # Reject things that are clearly not names: sluglines and transitions.
     if SLUG_RE.match(stripped) or TRANSITION_RE.match(stripped.rstrip("^").strip()):

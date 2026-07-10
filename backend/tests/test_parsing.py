@@ -186,6 +186,47 @@ def test_dialogue_heavy_layout_still_finds_the_action_margin():
     assert "Edward slips his ring off." in actions
 
 
+def test_lowercase_contd_cue_continues_dialogue():
+    """Production PDFs re-cue continued speeches as 'EDWARD (cont'd)' in
+    lowercase — the name must anchor the cue, not the whole line (this cost
+    the Big Fish PDF ~18% of its dialogue words)."""
+    text = (
+        "INT. GUEST BEDROOM - NIGHT\n"
+        "\n"
+        "                   EDWARD\n"
+        "         You know what portentous means?\n"
+        "\n"
+        "She shakes her head.\n"
+        "\n"
+        "                   EDWARD (cont’d)\n"
+        "         Means when you dream about something\n"
+        "         that's going to happen.\n"
+    )
+    parsed = parse_text(text)
+    chars = {c.name: c for c in parsed.characters()}
+    assert set(chars) == {"EDWARD"}
+    assert chars["EDWARD"].dialogue_line_count == 3
+
+
+def test_page_headers_are_stripped():
+    text = (
+        "INT. DINER - DAY\n"
+        "\n"
+        "                   MAE\n"
+        "         You look like a man who forgot\n"
+        "\n"
+        "BIG FISH - FINAL   53.\n"
+        "\n"
+        "                   MAE (cont'd)\n"
+        "         how to ask for things.\n"
+    )
+    parsed = parse_text(text)
+    everything = "\n".join(s.raw_text for s in parsed.scenes)
+    assert "BIG FISH - FINAL" not in everything
+    chars = {c.name: c for c in parsed.characters()}
+    assert chars["MAE"].dialogue_line_count == 2
+
+
 def test_shooting_script_letter_prefixed_scene_numbers():
     # A12 / 12B insert numbering is standard in production drafts (audit finding).
     text = (
