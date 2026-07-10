@@ -83,18 +83,25 @@ class PipelineContext:
         self.script_hash = self.draft["content_hash"]
 
     # -- cache ------------------------------------------------------------
-    # Generation options are part of cache identity (audit finding): the same
-    # prompt at a different num_ctx/temperature is a different computation.
+    # Cache identity = model + generation options + prompt version + parser
+    # version. The parser version matters because every LLM stage consumes
+    # the parse (digest, retrieval packs): a parser fix that changes the
+    # parse must invalidate downstream stage outputs, or a re-run silently
+    # replays results computed from the old, wrong parse — observed live
+    # when the Big Fish PDF re-ran in 3 minutes on stale specialist outputs.
+    def _cache_version(self) -> str:
+        return f"{prompts.PROMPT_VERSION}+p{PARSER_VERSION}"
+
     def cache_get(self, stage: str, model: str, options: dict | None = None) -> dict | None:
         raw = repository.cache_get(
-            self.conn, self.script_hash, stage, model + _options_tag(options), prompts.PROMPT_VERSION
+            self.conn, self.script_hash, stage, model + _options_tag(options), self._cache_version()
         )
         return json.loads(raw) if raw is not None else None
 
     def cache_put(self, stage: str, model: str, payload: dict, options: dict | None = None) -> None:
         repository.cache_put(
             self.conn, self.script_hash, stage, model + _options_tag(options),
-            prompts.PROMPT_VERSION, json.dumps(payload),
+            self._cache_version(), json.dumps(payload),
         )
 
     # -- progress ----------------------------------------------------------

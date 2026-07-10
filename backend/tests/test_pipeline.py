@@ -154,6 +154,23 @@ async def test_generation_options_change_busts_cache(app, client, monkeypatch):
     assert runtime.history.count("map") == 3  # unchanged worker options reused
 
 
+async def test_parser_version_changes_bust_llm_stage_cache(app, client, monkeypatch):
+    """A parser upgrade changes what every LLM stage consumes — cached stage
+    outputs from the old parse must not be replayed (Big Fish PDF finding)."""
+    runtime: FakeRuntime = app.state.runtime
+    first = await analyze(client)
+    await wait_done(client, first["report_id"])
+    calls_after_first = runtime.generate_calls
+
+    from screenscore.pipeline import stages
+    monkeypatch.setattr(stages, "PARSER_VERSION", "999-test")
+
+    second = await analyze(client, project_id=first["project_id"])
+    body2 = await wait_done(client, second["report_id"])
+    assert body2["status"] == "complete"
+    assert runtime.generate_calls > calls_after_first
+
+
 async def test_prompt_version_changes_bust_cache(app, client, monkeypatch):
     runtime: FakeRuntime = app.state.runtime
     first = await analyze(client)
