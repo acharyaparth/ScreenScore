@@ -55,6 +55,16 @@ export const api = {
     return resp.json()
   },
 
+  async reanalyze(draftId: string): Promise<{ project_id: string; draft_id: string; report_id: string }> {
+    const resp = await fetch(`/api/drafts/${draftId}/reanalyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    if (!resp.ok) throw new Error(`could not start the analysis (${resp.status})`)
+    return resp.json()
+  },
+
   async createDiff(fromReportId: string, toReportId: string): Promise<{ diff_id: string }> {
     const resp = await fetch('/api/diffs', {
       method: 'POST',

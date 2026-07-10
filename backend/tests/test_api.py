@@ -181,6 +181,24 @@ async def test_unparseable_screenplay_fails_honestly(client):
     assert "segmented" in body["error"]
 
 
+async def test_reanalyze_existing_draft(client):
+    ids = (await client.post(
+        "/api/analyze", files={"file": ("re.fountain", FOUNTAIN_SAMPLE, "text/plain")},
+    )).json()
+    await wait_complete(client, ids["report_id"])
+
+    resp = await client.post(f"/api/drafts/{ids['draft_id']}/reanalyze", json={})
+    assert resp.status_code == 200
+    second = resp.json()
+    assert second["draft_id"] == ids["draft_id"]
+    assert second["report_id"] != ids["report_id"]
+    body = await wait_complete(client, second["report_id"])
+    assert body["status"] == "complete"
+
+    missing = await client.post("/api/drafts/nope/reanalyze", json={})
+    assert missing.status_code == 404
+
+
 async def test_unsupported_extension_rejected(client):
     resp = await client.post(
         "/api/analyze", files={"file": ("script.docx", b"whatever", "application/octet-stream")},

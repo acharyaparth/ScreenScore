@@ -224,6 +224,42 @@ async def analyze(
     }
 
 
+class ReanalyzeRequest(BaseModel):
+    worker_model: str | None = None
+    reasoning_model: str | None = None
+
+
+@router.post("/drafts/{draft_id}/reanalyze")
+async def reanalyze_draft(
+    request: Request, draft_id: str, body: ReanalyzeRequest | None = None,
+    conn: sqlite3.Connection = Depends(get_conn),
+):
+    """Run a fresh analysis of an already-uploaded draft — recovery path for
+    failed runs and the way to re-run after model/prompt upgrades."""
+    draft = repository.get_draft(conn, draft_id)
+    if draft is None:
+        raise HTTPException(404, "draft not found")
+    body = body or ReanalyzeRequest()
+    worker_model, reasoning_model = body.worker_model, body.reasoning_model
+    if not worker_model or not reasoning_model:
+        recommendation = hardware.recommend(hardware.detect())
+        worker_model = worker_model or recommendation.worker_model
+        reasoning_model = reasoning_model or recommendation.reasoning_model
+    report = repository.create_report(
+        conn,
+        draft_id=draft["id"],
+        schema_version=config.REPORT_SCHEMA_VERSION,
+        prompt_version=prompts.PROMPT_VERSION,
+        worker_model=worker_model,
+        reasoning_model=reasoning_model,
+    )
+    task_conn = db.connect(request.app.state.db_path)
+    asyncio.create_task(
+        stages.run_pipeline(report["id"], task_conn, request.app.state.bus, request.app.state.runtime)
+    )
+    return {"project_id": draft["project_id"], "draft_id": draft["id"], "report_id": report["id"]}
+
+
 @router.get("/drafts/{draft_id}/parse")
 def get_parse(draft_id: str, conn: sqlite3.Connection = Depends(get_conn)):
     """The cached structured parse for a draft (scenes, characters, warnings)."""

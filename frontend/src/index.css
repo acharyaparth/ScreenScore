@@ -4,6 +4,49 @@
 
 @layer base {
   body {
-    @apply bg-stone-50 text-stone-900 antialiased;
+    @apply bg-page text-ink antialiased;
+  }
+  /* One focus language everywhere: ink ring on paper. */
+  :focus-visible {
+    outline: 2px solid #1a1915;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+@layer components {
+  /* Coverage-form field label: 11px letterspaced uppercase mono. */
+  .label {
+    @apply font-mono text-[11px] uppercase tracking-[0.14em] text-graphite;
+  }
+  .btn {
+    @apply inline-flex items-center gap-1.5 rounded border border-ink bg-ink px-3 py-1.5 text-sm text-white hover:bg-[#33312B] disabled:opacity-40 disabled:pointer-events-none;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 rounded border border-rule bg-sheet px-3 py-1.5 text-sm text-ink hover:border-graphite;
+  }
+  .sheet {
+    @apply rounded-lg border border-rule bg-sheet;
+  }
+}
+
+/* The marker sweep: evidence highlight animates in once, left to right. */
+@keyframes marker-sweep {
+  from { background-size: 0% 100%; }
+  to { background-size: 100% 100%; }
+}
+.marker-hit {
+  background-image: linear-gradient(#f5e27a, #f5e27a);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  animation: marker-sweep 0.5s ease-out;
+  border-radius: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marker-hit {
+    animation: none;
+  }
+  .animate-pulse {
+    animation: none;
   }
 }

@@ -205,6 +205,7 @@ export interface DiffPayload {
       from_scenes: number | null
       to_scenes: number | null
     }
+    content_similarity?: number | null
   }
   narrative: {
     overall: string

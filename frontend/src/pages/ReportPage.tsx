@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
+import { Callout, SceneChip, ScoreMark, SectionHead, VerdictWord } from '../components/ui'
 import type {
   Annotation,
   AnnotationStatus,
@@ -9,22 +10,7 @@ import type {
   Report,
   ReportRow,
   RubricDimension,
-  Score,
-  Verdict,
 } from '../types'
-
-const SCORE_STYLE: Record<Score, string> = {
-  weak: 'bg-red-50 text-red-700 ring-red-200',
-  fair: 'bg-amber-50 text-amber-700 ring-amber-200',
-  good: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  excellent: 'bg-emerald-100 text-emerald-900 ring-emerald-300',
-}
-
-const VERDICT_STYLE: Record<Verdict, string> = {
-  pass: 'bg-red-50 text-red-800 border-red-200',
-  consider: 'bg-amber-50 text-amber-800 border-amber-200',
-  recommend: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-}
 
 const ANNOTATION_LABEL: Record<AnnotationStatus, string> = {
   working: 'working on it',
@@ -32,56 +18,52 @@ const ANNOTATION_LABEL: Record<AnnotationStatus, string> = {
   dismissed: 'dismissed',
 }
 
-interface Highlight {
+/** What the script pane is currently showing: a scene, an optional quote to
+ * mark, and the evidence list being stepped through. */
+interface Focus {
   scene: number
   quote: string | null
+  list: Evidence[]
+  index: number
 }
 
-function ScorePill({ score, insufficient }: { score: Score | null; insufficient: boolean }) {
-  if (insufficient || score === null) {
-    return (
-      <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-500 ring-1 ring-stone-200">
-        insufficient evidence
-      </span>
-    )
-  }
-  return (
-    <span className={`rounded-full px-3 py-1 text-xs font-medium capitalize ring-1 ${SCORE_STYLE[score]}`}>
-      {score}
-    </span>
-  )
-}
+/* ---------------------------------- evidence ---------------------------------- */
 
 function EvidenceList({
   evidence,
   onJump,
 }: {
   evidence: Evidence[]
-  onJump: (h: Highlight) => void
+  onJump: (list: Evidence[], index: number) => void
 }) {
   if (!evidence.length) return null
   return (
     <ul className="mt-3 space-y-2">
       {evidence.map((ev, i) => (
-        <li key={i} className="border-l-2 border-stone-300 pl-3 text-sm">
-          <button
-            className="group text-left"
-            onClick={() => onJump({ scene: ev.scene_number, quote: ev.quote })}
-            title="Show in script"
-          >
-            <span className="mr-2 font-mono text-xs text-stone-400 underline decoration-dotted group-hover:text-stone-700">
-              SC {ev.scene_number}
-            </span>
-            <span className="italic text-stone-600 group-hover:text-stone-900">“{ev.quote}”</span>
-          </button>
-          {ev.note && <p className="mt-0.5 text-xs text-stone-400">{ev.note}</p>}
+        <li key={i} className="flex items-start gap-2 text-sm">
+          <SceneChip
+            scene={ev.scene_number}
+            verified
+            onClick={() => onJump(evidence, i)}
+            title={`Show this line in scene ${ev.scene_number}`}
+          />
+          <span className="min-w-0">
+            <button
+              className="text-left italic text-graphite hover:text-ink"
+              onClick={() => onJump(evidence, i)}
+            >
+              “{ev.quote}”
+            </button>
+            {ev.note && <span className="block text-xs text-graphite/80">{ev.note}</span>}
+          </span>
         </li>
       ))}
     </ul>
   )
 }
 
-/** The writer's memory layer: status + note per report element. */
+/* --------------------------------- annotations -------------------------------- */
+
 function AnnotationControl({
   reportId,
   targetRef,
@@ -112,16 +94,18 @@ function AnnotationControl({
   }
 
   return (
-    <div className="mt-3 border-t border-stone-100 pt-2">
-      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+    <div className="mt-3 border-t border-rule pt-2.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="label mr-1">Your call</span>
         {(Object.keys(ANNOTATION_LABEL) as AnnotationStatus[]).map((status) => (
           <button
             key={status}
             onClick={() => setStatus(status)}
-            className={`rounded-full px-2.5 py-0.5 ring-1 transition-colors ${
+            aria-pressed={annotation?.status === status}
+            className={`rounded-full px-2.5 py-0.5 font-mono text-[11px] transition-colors ${
               annotation?.status === status
-                ? 'bg-stone-900 text-white ring-stone-900'
-                : 'bg-white text-stone-500 ring-stone-200 hover:ring-stone-400'
+                ? 'bg-ink text-white'
+                : 'border border-rule bg-sheet text-graphite hover:border-graphite'
             }`}
           >
             {ANNOTATION_LABEL[status]}
@@ -129,13 +113,13 @@ function AnnotationControl({
         ))}
         <button
           onClick={() => setNoteOpen(!noteOpen)}
-          className="ml-1 text-stone-400 underline decoration-dotted hover:text-stone-700"
+          className="ml-1 text-xs text-graphite underline decoration-dotted underline-offset-2 hover:text-ink"
         >
           {annotation?.note ? 'edit note' : 'add note'}
         </button>
       </div>
       {annotation?.note && !noteOpen && (
-        <p className="mt-1.5 text-xs text-stone-500">✎ {annotation.note}</p>
+        <p className="mt-1.5 text-xs text-graphite">✎ {annotation.note}</p>
       )}
       {noteOpen && (
         <div className="mt-2 flex gap-2">
@@ -143,10 +127,11 @@ function AnnotationControl({
             value={noteDraft}
             onChange={(e) => setNoteDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && saveNote()}
-            placeholder="Your note to self…"
-            className="w-full rounded border border-stone-300 px-2 py-1 text-xs"
+            placeholder="Note to self for the rewrite…"
+            aria-label="Annotation note"
+            className="w-full rounded border border-rule px-2 py-1 text-xs"
           />
-          <button onClick={saveNote} className="rounded bg-stone-900 px-2 py-1 text-xs text-white">
+          <button onClick={saveNote} className="btn text-xs">
             Save
           </button>
         </div>
@@ -154,6 +139,8 @@ function AnnotationControl({
     </div>
   )
 }
+
+/* ----------------------------------- rubric ----------------------------------- */
 
 function Dimension({
   dim,
@@ -168,28 +155,41 @@ function Dimension({
   targetRef: string
   annotation: Annotation | undefined
   onAnnotation: (a: Annotation) => void
-  onJump: (h: Highlight) => void
+  onJump: (list: Evidence[], index: number) => void
 }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="rounded-lg border border-stone-200 bg-white">
+    <div className="sheet">
       <button
-        className="flex w-full items-center justify-between px-5 py-4 text-left"
+        className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
       >
-        <span className="font-medium">
-          {dim.name}
-          {annotation && (
-            <span className="ml-2 text-xs font-normal text-stone-400">
-              · {ANNOTATION_LABEL[annotation.status]}
-            </span>
-          )}
+        <span className="min-w-0">
+          <span className="block font-medium">{dim.name}</span>
+          <span className="font-mono text-[11px] text-graphite">
+            {dim.insufficient_evidence
+              ? 'no verifiable grounding — score withheld'
+              : `${dim.evidence.length} verified citation${dim.evidence.length === 1 ? '' : 's'}`}
+            {annotation && ` · ✎ ${ANNOTATION_LABEL[annotation.status]}`}
+          </span>
         </span>
-        <ScorePill score={dim.score} insufficient={dim.insufficient_evidence} />
+        <ScoreMark score={dim.score} insufficient={dim.insufficient_evidence} />
       </button>
       {open && (
-        <div className="border-t border-stone-100 px-5 py-4">
-          <p className="text-sm text-stone-600">{dim.rationale}</p>
+        <div className="border-t border-rule px-5 py-4">
+          {dim.insufficient_evidence && (
+            <div className="mb-3">
+              <Callout tone="warn">
+                <p>
+                  No citation for this dimension survived verification against your script, so
+                  ScreenScore withholds the score instead of guessing. A cleaner file format or a
+                  stronger model can help.
+                </p>
+              </Callout>
+            </div>
+          )}
+          <p className="text-sm leading-relaxed text-ink">{dim.rationale}</p>
           <EvidenceList evidence={dim.evidence} onJump={onJump} />
           <AnnotationControl
             reportId={reportId}
@@ -203,65 +203,120 @@ function Dimension({
   )
 }
 
-/** Length-preserving normalization so match indexes map back to the source. */
+/* --------------------------------- script pane -------------------------------- */
+
 function normalizeForSearch(text: string): string {
   return text.toLowerCase().replace(/[’‘]/g, "'").replace(/[“”]/g, '"')
 }
 
-function SceneBlock({ scene, highlight }: { scene: ParseData['scenes'][0]; highlight: Highlight | null }) {
-  const active = highlight?.scene === scene.number
-  const parts = useMemo(() => {
+function SceneBlock({ scene, focus }: { scene: ParseData['scenes'][0]; focus: Focus | null }) {
+  const active = focus?.scene === scene.number
+  // The block header already shows the slugline — don't print it twice.
+  const body = useMemo(() => {
     const text = scene.raw_text
-    if (!active || !highlight?.quote) return null
-    const idx = normalizeForSearch(text).indexOf(normalizeForSearch(highlight.quote))
+    const firstBreak = text.indexOf('\n')
+    if (firstBreak !== -1 && text.slice(0, firstBreak).trim() === scene.slugline) {
+      return text.slice(firstBreak + 1).replace(/^\n+/, '')
+    }
+    return text
+  }, [scene.raw_text, scene.slugline])
+  const parts = useMemo(() => {
+    if (!active || !focus?.quote) return null
+    const text = body
+    const idx = normalizeForSearch(text).indexOf(normalizeForSearch(focus.quote))
     if (idx === -1) return null
-    return [text.slice(0, idx), text.slice(idx, idx + highlight.quote.length), text.slice(idx + highlight.quote.length)]
-  }, [scene.raw_text, active, highlight?.quote])
+    return [text.slice(0, idx), text.slice(idx, idx + focus.quote.length), text.slice(idx + focus.quote.length)]
+  }, [body, active, focus?.quote])
 
   return (
     <div
       id={`scene-${scene.number}`}
-      className={`rounded px-3 py-2 ${active ? 'bg-amber-50 ring-1 ring-amber-200' : ''}`}
+      data-scene={scene.number}
+      className={`px-3 py-2 ${active ? 'border-l-2 border-ink bg-page' : ''}`}
     >
-      <p className="font-mono text-xs font-semibold text-stone-500">
-        {scene.number}. {scene.slugline}
+      <p className="font-mono text-[11px] font-semibold tracking-wide text-graphite">
+        {scene.number} · {scene.slugline}
       </p>
-      <pre className="mt-1 whitespace-pre-wrap font-mono text-xs leading-relaxed text-stone-700">
+      <pre className="mt-1 whitespace-pre-wrap font-mono text-xs leading-relaxed text-ink/90">
         {parts ? (
           <>
             {parts[0]}
-            <mark className="bg-amber-200 px-0.5">{parts[1]}</mark>
+            <mark className="marker-hit px-0.5 font-semibold text-ink">{parts[1]}</mark>
             {parts[2]}
           </>
         ) : (
-          scene.raw_text
+          body
         )}
       </pre>
     </div>
   )
 }
 
-function ScriptPane({ parse, highlight }: { parse: ParseData; highlight: Highlight | null }) {
+function ScriptPane({
+  parse,
+  focus,
+  onStep,
+  onClose,
+}: {
+  parse: ParseData
+  focus: Focus | null
+  onStep: (delta: number) => void
+  onClose: () => void
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [visibleScene, setVisibleScene] = useState<number | null>(null)
+
+  // Sticky context: always name the scene the reader is looking at.
+  const onScroll = useCallback(() => {
+    const container = scrollRef.current
+    if (!container) return
+    const blocks = container.querySelectorAll<HTMLElement>('[data-scene]')
+    const top = container.getBoundingClientRect().top + 48
+    let current: number | null = null
+    blocks.forEach((el) => {
+      if (el.getBoundingClientRect().top <= top) current = Number(el.dataset.scene)
+    })
+    setVisibleScene(current)
+  }, [])
+
+  const currentScene = parse.scenes.find((s) => s.number === (visibleScene ?? focus?.scene))
+  const hasStepper = focus && focus.list.length > 1
+
   return (
-    <div className="max-h-[85vh] overflow-y-auto rounded-lg border border-stone-200 bg-white p-4">
-      <h2 className="mb-3 font-serif text-lg">Script</h2>
-      <div className="space-y-3">
+    <section aria-label="Script" className="sheet flex max-h-[85vh] flex-col overflow-hidden">
+      <div className="flex items-center justify-between gap-2 border-b border-rule bg-page px-3 py-2">
+        <p className="min-w-0 truncate font-mono text-[11px] uppercase tracking-wider text-graphite">
+          {currentScene ? `${currentScene.number} · ${currentScene.slugline}` : 'Your script'}
+        </p>
+        <div className="flex shrink-0 items-center gap-1">
+          {hasStepper && (
+            <>
+              <span className="mr-1 font-mono text-[11px] text-graphite">
+                citation {focus!.index + 1} of {focus!.list.length}
+              </span>
+              <button className="btn-ghost px-1.5 py-0.5 text-xs" onClick={() => onStep(-1)} aria-label="Previous citation">
+                ↑
+              </button>
+              <button className="btn-ghost px-1.5 py-0.5 text-xs" onClick={() => onStep(1)} aria-label="Next citation">
+                ↓
+              </button>
+            </>
+          )}
+          <button className="btn-ghost px-2 py-0.5 text-xs lg:hidden" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+      <div ref={scrollRef} onScroll={onScroll} className="divide-y divide-rule/60 overflow-y-auto">
         {parse.scenes.map((scene) => (
-          <SceneBlock key={scene.number} scene={scene} highlight={highlight} />
+          <SceneBlock key={scene.number} scene={scene} focus={focus} />
         ))}
       </div>
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-10">
-      <h2 className="font-serif text-xl">{title}</h2>
-      <div className="mt-3">{children}</div>
     </section>
   )
 }
+
+/* ------------------------------------ page ------------------------------------ */
 
 export default function ReportPage() {
   const { reportId } = useParams()
@@ -269,169 +324,239 @@ export default function ReportPage() {
   const [parse, setParse] = useState<ParseData | null>(null)
   const [annotations, setAnnotations] = useState<Record<string, Annotation>>({})
   const [error, setError] = useState<string | null>(null)
-  const [highlight, setHighlight] = useState<Highlight | null>(null)
+  const [focus, setFocus] = useState<Focus | null>(null)
   const [scriptOpen, setScriptOpen] = useState(false)
-  const scriptRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!reportId) return
-    api.report(reportId).then((r) => {
-      setRow(r)
-      if (r.draft_id) api.parse(r.draft_id).then(setParse).catch(() => setParse(null))
-    }).catch((e) => setError(String(e)))
-    api.annotations(reportId).then((r) => {
-      setAnnotations(Object.fromEntries(r.annotations.map((a) => [a.target_ref, a])))
-    }).catch(() => {})
+    api
+      .report(reportId)
+      .then((r) => {
+        setRow(r)
+        if (r.draft_id) api.parse(r.draft_id).then(setParse).catch(() => setParse(null))
+      })
+      .catch((e) => setError(String(e)))
+    api
+      .annotations(reportId)
+      .then((r) => setAnnotations(Object.fromEntries(r.annotations.map((a) => [a.target_ref, a]))))
+      .catch(() => {})
   }, [reportId])
 
-  const jump = useCallback((h: Highlight) => {
-    setHighlight(h)
-    setScriptOpen(true)
-    // Wait for the pane to render before scrolling.
-    setTimeout(() => {
-      document.getElementById(`scene-${h.scene}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 60)
+  const scrollToScene = useCallback((scene: number) => {
+    window.setTimeout(() => {
+      document.getElementById(`scene-${scene}`)?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        block: 'center',
+      })
+    }, 80)
   }, [])
+
+  const jump = useCallback(
+    (list: Evidence[], index: number) => {
+      const ev = list[index]
+      setFocus({ scene: ev.scene_number, quote: ev.quote, list, index })
+      setScriptOpen(true)
+      scrollToScene(ev.scene_number)
+    },
+    [scrollToScene],
+  )
+
+  const jumpScene = useCallback(
+    (scene: number) => {
+      setFocus({ scene, quote: null, list: [], index: 0 })
+      setScriptOpen(true)
+      scrollToScene(scene)
+    },
+    [scrollToScene],
+  )
+
+  const step = useCallback(
+    (delta: number) => {
+      setFocus((prev) => {
+        if (!prev || prev.list.length === 0) return prev
+        const index = (prev.index + delta + prev.list.length) % prev.list.length
+        const ev = prev.list[index]
+        scrollToScene(ev.scene_number)
+        return { scene: ev.scene_number, quote: ev.quote, list: prev.list, index }
+      })
+    },
+    [scrollToScene],
+  )
 
   const onAnnotation = useCallback((a: Annotation) => {
     setAnnotations((prev) => ({ ...prev, [a.target_ref]: a }))
   }, [])
 
-  if (error) return <p className="text-red-700">{error}</p>
-  if (!row) return <p className="text-stone-400">Loading…</p>
+  if (error) {
+    return (
+      <Callout tone="error" title="This report couldn't load">
+        <p>{error}</p>
+      </Callout>
+    )
+  }
+  if (!row) return <p className="text-graphite">Loading the report…</p>
+  if (row.status === 'failed') {
+    return (
+      <div className="mx-auto max-w-column">
+        <Callout tone="error" title="This analysis failed">
+          <p>{row.error ?? 'No error detail was recorded.'}</p>
+          <p className="mt-2 text-xs">
+            The draft is still in your library — open its project to run the analysis again.
+          </p>
+        </Callout>
+      </div>
+    )
+  }
   if (row.status !== 'complete' || !row.report) {
     return (
-      <p className="text-stone-500">
-        This report is {row.status}.{' '}
-        {row.error && <span className="text-red-700">{row.error}</span>}
-      </p>
+      <div className="mx-auto max-w-column">
+        <Callout tone="info" title="Still analyzing">
+          <p>
+            This report is {row.status}. Watch its progress on the{' '}
+            <Link className="underline" to="/analyze">
+              Analyze page
+            </Link>
+            , or come back — it opens here when finished.
+          </p>
+        </Callout>
+      </div>
     )
   }
 
   const report: Report = row.report
-  const verdict = report.recommendation.verdict
 
   return (
-    <div className={scriptOpen && parse ? 'mx-auto grid max-w-7xl gap-6 lg:grid-cols-[minmax(0,1fr),420px]' : ''}>
+    <div className={scriptOpen && parse ? 'grid gap-6 lg:grid-cols-[minmax(0,1fr),26rem]' : 'mx-auto max-w-column'}>
       <article className="min-w-0">
         {report.meta.stub && (
-          <p className="mb-6 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            This report was generated by the <strong>built-in development model</strong>, not a real
-            analysis model. Structure and citations are real; the judgments are placeholders.
-          </p>
+          <div className="mb-6">
+            <Callout tone="warn" title="Development model">
+              <p>
+                This report came from the built-in placeholder model. Structure and citations are
+                real; the judgments are not. Analyze with a real local model for actual coverage.
+              </p>
+            </Callout>
+          </div>
         )}
 
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm text-stone-400">
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="label">
               Coverage · {new Date(report.meta.generated_at).toLocaleDateString()}
             </p>
-            <h1 className="mt-1 font-serif text-4xl">{report.header.title}</h1>
-            <p className="mt-2 text-sm text-stone-500">
-              {report.header.page_count && `${report.header.page_count} pages`}
-              {report.header.estimated_runtime_minutes && ` · ≈${report.header.estimated_runtime_minutes} min`}
-              {report.header.scene_count && ` · ${report.header.scene_count} scenes`}
-              {report.header.genres.length > 0 && ` · ${report.header.genres.map((g) => g.name).join(', ')}`}
+            <h1 className="mt-1 font-serif text-4xl leading-tight">{report.header.title}</h1>
+            <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-graphite">
+              {[
+                report.header.writers.length > 0 && `by ${report.header.writers.join(', ')}`,
+                report.header.page_count && `${report.header.page_count} pp`,
+                report.header.scene_count && `${report.header.scene_count} scenes`,
+                report.header.genres.length > 0 && report.header.genres.map((g) => g.name).join(' / '),
+              ]
+                .filter(Boolean)
+                .join(' · ')}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-xs text-stone-400">Export</span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="label mr-1">Export</span>
             {(['pdf', 'md', 'json'] as const).map((fmt) => (
-              <a
-                key={fmt}
-                href={`/api/reports/${row.id}/export/${fmt}`}
-                className="rounded border border-stone-300 px-2 py-1 text-xs uppercase text-stone-600 hover:bg-stone-100"
-              >
+              <a key={fmt} href={`/api/reports/${row.id}/export/${fmt}`} className="btn-ghost px-2 py-1 font-mono text-[11px] uppercase">
                 {fmt}
               </a>
             ))}
             {parse && (
-              <button
-                onClick={() => setScriptOpen(!scriptOpen)}
-                className="ml-2 rounded border border-stone-300 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
-              >
+              <button className="btn-ghost ml-2 text-sm" onClick={() => setScriptOpen(!scriptOpen)} aria-pressed={scriptOpen}>
                 {scriptOpen ? 'Hide script' : 'Show script'}
               </button>
             )}
           </div>
         </header>
 
-        <div className={`mt-8 rounded-lg border px-6 py-5 ${VERDICT_STYLE[verdict]}`}>
-          <p className="text-xs font-medium uppercase tracking-widest">Recommendation</p>
-          <p className="mt-1 font-serif text-2xl capitalize">{verdict}</p>
-          <p className="mt-2 text-sm">{report.recommendation.rationale}</p>
+        {/* The read: verdict + logline together, first. */}
+        <section className="sheet mt-8 px-6 py-5">
+          <p className="label">The read</p>
+          <div className="mt-2">
+            <VerdictWord verdict={report.recommendation.verdict} />
+          </div>
+          <p className="mt-3 max-w-prose text-sm leading-relaxed">{report.recommendation.rationale}</p>
+          <p className="mt-4 border-t border-rule pt-3 font-serif text-lg leading-snug">
+            {report.logline}
+          </p>
+        </section>
+
+        <SectionHead eyebrow="Scored rubric" title="Scorecard" />
+        <p className="mt-2 text-xs text-graphite">
+          Every score cites lines that were verified to exist in your script. Click any citation
+          to see it on the page.
+        </p>
+        <div className="mt-4 space-y-2">
+          {report.rubric.map((dim, index) => (
+            <Dimension
+              key={dim.id}
+              dim={dim}
+              reportId={row.id}
+              targetRef={`/rubric/${index}`}
+              annotation={annotations[`/rubric/${index}`]}
+              onAnnotation={onAnnotation}
+              onJump={jump}
+            />
+          ))}
         </div>
 
-        <Section title="Logline">
-          <p className="text-stone-700">{report.logline}</p>
-        </Section>
+        <SectionHead eyebrow="Story" title="Synopsis" />
+        {report.synopsis.overview && (
+          <p className="mt-3 text-sm leading-relaxed text-graphite">{report.synopsis.overview}</p>
+        )}
+        <div className="mt-3 space-y-4">
+          {report.synopsis.acts.map((act) => (
+            <div key={act.act}>
+              <h3 className="label">{act.act}</h3>
+              <p className="mt-1 text-sm leading-relaxed">{act.summary}</p>
+            </div>
+          ))}
+        </div>
 
-        <Section title="Scorecard">
-          <div className="space-y-2">
-            {report.rubric.map((dim, index) => (
-              <Dimension
-                key={dim.id}
-                dim={dim}
-                reportId={row.id}
-                targetRef={`/rubric/${index}`}
-                annotation={annotations[`/rubric/${index}`]}
-                onAnnotation={onAnnotation}
-                onJump={jump}
-              />
-            ))}
-          </div>
-        </Section>
-
-        <Section title="Synopsis">
-          {report.synopsis.overview && <p className="text-sm text-stone-600">{report.synopsis.overview}</p>}
-          <div className="mt-3 space-y-4">
-            {report.synopsis.acts.map((act) => (
-              <div key={act.act}>
-                <h3 className="text-sm font-medium text-stone-500">{act.act}</h3>
-                <p className="mt-1 text-sm text-stone-700">{act.summary}</p>
+        <SectionHead eyebrow="People" title="Characters" />
+        <div className="mt-4 space-y-2">
+          {report.characters.principals.map((c) => (
+            <div key={c.name} className="sheet px-5 py-3.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="font-mono text-sm font-semibold">{c.name}</h3>
+                {c.dialogue_share !== null && (
+                  <button
+                    className="font-mono text-[11px] text-graphite underline decoration-dotted underline-offset-2 hover:text-ink"
+                    onClick={() => c.scene_numbers[0] && jumpScene(c.scene_numbers[0])}
+                  >
+                    {(c.dialogue_share * 100).toFixed(0)}% of dialogue · {c.scene_numbers.length} scenes
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        </Section>
+              <p className="mt-1 text-sm">{c.description}</p>
+              <p className="mt-0.5 text-sm text-graphite">{c.arc_summary}</p>
+            </div>
+          ))}
+        </div>
 
-        <Section title="Characters">
-          <div className="space-y-3">
-            {report.characters.principals.map((c) => (
-              <div key={c.name} className="rounded-lg border border-stone-200 bg-white p-4">
-                <div className="flex items-baseline justify-between">
-                  <h3 className="font-medium">{c.name}</h3>
-                  {c.dialogue_share !== null && (
-                    <span className="text-xs text-stone-400">
-                      {(c.dialogue_share * 100).toFixed(0)}% of dialogue ·{' '}
-                      <button
-                        className="underline decoration-dotted hover:text-stone-700"
-                        onClick={() => c.scene_numbers[0] && jump({ scene: c.scene_numbers[0], quote: null })}
-                      >
-                        {c.scene_numbers.length} scenes
-                      </button>
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-sm text-stone-600">{c.description}</p>
-                <p className="mt-1 text-sm text-stone-500">{c.arc_summary}</p>
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="Scene notes">
-          <ul className="space-y-3">
+        <SectionHead eyebrow="On the page" title="Scene notes" />
+        {report.scene_notes.length === 0 ? (
+          <p className="mt-3 text-sm text-graphite">The analysis didn't single out standout or problem scenes for this draft.</p>
+        ) : (
+          <ul className="mt-4 space-y-2">
             {report.scene_notes.map((note, index) => (
-              <li key={index} className="rounded-lg border border-stone-200 bg-white p-4 text-sm">
-                <button
-                  className={`mr-2 rounded px-2 py-0.5 text-xs font-medium underline-offset-2 hover:underline ${
-                    note.kind === 'standout' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-                  }`}
-                  onClick={() => jump({ scene: note.scene_number, quote: note.evidence?.[0]?.quote ?? null })}
-                >
-                  {note.kind} · scene {note.scene_number}
-                </button>
-                <p className="mt-2 text-stone-700">{note.note}</p>
+              <li key={index} className="sheet px-5 py-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <SceneChip
+                    scene={note.scene_number}
+                    onClick={() => (note.evidence?.[0] ? jump(note.evidence, 0) : jumpScene(note.scene_number))}
+                  />
+                  <span
+                    className={`font-mono text-[11px] uppercase tracking-wider ${
+                      note.kind === 'standout' ? 'text-score-good' : 'text-score-weak'
+                    }`}
+                  >
+                    {note.kind}
+                  </span>
+                </div>
+                <p className="mt-2 leading-relaxed">{note.note}</p>
                 {note.evidence && <EvidenceList evidence={note.evidence} onJump={jump} />}
                 <AnnotationControl
                   reportId={row.id}
@@ -442,56 +567,69 @@ export default function ReportPage() {
               </li>
             ))}
           </ul>
-        </Section>
+        )}
 
-        <Section title="Comparables">
-          <p className="text-xs text-stone-400">{report.comps.disclaimer}</p>
-          <ul className="mt-3 space-y-2">
-            {report.comps.items.map((comp) => (
-              <li key={comp.title} className="text-sm">
-                <span className="font-medium">{comp.title}</span>
-                {comp.year && <span className="text-stone-400"> ({comp.year})</span>} —{' '}
-                <span className="text-stone-600">{comp.reason}</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border border-stone-200 bg-white p-4">
-            <h3 className="text-xs font-medium uppercase tracking-widest text-stone-400">Budget tier</h3>
+        <SectionHead eyebrow="Market" title="Commercial" />
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="sheet px-5 py-4">
+            <p className="label">Budget tier</p>
             <p className="mt-1 font-serif text-xl capitalize">{report.budget_tier.tier}</p>
-            <ul className="mt-2 list-inside list-disc text-sm text-stone-600">
+            <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm text-graphite">
               {report.budget_tier.drivers.map((d) => (
                 <li key={d}>{d}</li>
               ))}
             </ul>
           </div>
-          <div className="rounded-lg border border-stone-200 bg-white p-4">
-            <h3 className="text-xs font-medium uppercase tracking-widest text-stone-400">Content rating</h3>
+          <div className="sheet px-5 py-4">
+            <p className="label">Content rating (estimated)</p>
             <p className="mt-1 font-serif text-xl">{report.content_rating.estimated}</p>
-            <ul className="mt-2 space-y-1 text-sm text-stone-600">
+            <ul className="mt-2 space-y-1.5 text-sm text-graphite">
               {report.content_rating.drivers.map((d, i) => (
                 <li key={i}>
                   <span className="capitalize">{d.category.replace('_', ' ')}</span>: {d.detail}
+                  {d.evidence.length > 0 && (
+                    <span className="ml-1.5 inline-flex gap-1 align-middle">
+                      {d.evidence.map((ev, j) => (
+                        <SceneChip key={j} scene={ev.scene_number} verified onClick={() => jump(d.evidence, j)} />
+                      ))}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
           </div>
         </div>
 
-        <p className="mt-10 text-xs text-stone-400">
-          Engine {report.meta.engine_version} · prompts {report.meta.prompt_version} · schema{' '}
-          {report.schema_version}
-          {report.meta.models.reasoning &&
-            ` · models ${report.meta.models.worker} / ${report.meta.models.reasoning}`}{' '}
-          · generated locally, never uploaded.
+        <div className="mt-6 sheet px-5 py-4">
+          <p className="label">Comparable titles</p>
+          {report.comps.items.length === 0 ? (
+            <p className="mt-2 text-sm text-graphite">The model didn't offer comparable titles for this script.</p>
+          ) : (
+            <ul className="mt-2 space-y-1.5 text-sm">
+              {report.comps.items.map((comp) => (
+                <li key={comp.title}>
+                  <span className="font-medium">{comp.title}</span>
+                  {comp.year && <span className="text-graphite"> ({comp.year})</span>} —{' '}
+                  <span className="text-graphite">{comp.reason}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 border-t border-rule pt-2 text-xs text-graphite">{report.comps.disclaimer}</p>
+        </div>
+
+        <p className="mt-10 font-mono text-[11px] uppercase tracking-wider text-graphite">
+          Engine {report.meta.engine_version} · prompts {report.meta.prompt_version}
+          {report.meta.models.reasoning && ` · ${report.meta.models.worker} / ${report.meta.models.reasoning}`}{' '}
+          · generated locally — nothing left this machine
         </p>
       </article>
 
       {scriptOpen && parse && (
-        <div ref={scriptRef} className="lg:sticky lg:top-6 lg:self-start">
-          <ScriptPane parse={parse} highlight={highlight} />
+        <div className="fixed inset-0 z-20 bg-black/30 p-3 lg:static lg:z-auto lg:bg-transparent lg:p-0">
+          <div className="mx-auto h-full max-w-lg lg:sticky lg:top-6 lg:h-auto lg:max-w-none">
+            <ScriptPane parse={parse} focus={focus} onStep={step} onClose={() => setScriptOpen(false)} />
+          </div>
         </div>
       )}
     </div>
