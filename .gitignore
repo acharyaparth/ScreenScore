@@ -61,3 +61,6 @@ data/
 
 # Frontend build output
 frontend/dist/
+
+# Eval corpus/results: fetched scripts + generated variants, never committed
+evals_data/
