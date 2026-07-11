@@ -38,18 +38,33 @@ private material; ~$1–2/hr, a full sweep ≈ $15–40) or (b) a ≥32 GB machi
    dimensions genuinely lack evidence — the honest answer is
    `insufficient_evidence`, and claiming a score is a failure.
 
-## Metrics (mechanical first — the verification layer is the judge)
+## What we measure — coverage quality first
 
-| Metric | Source | What it selects for |
+The eval's subject is the **analysis itself**, not the plumbing. Reliability
+metrics still exist, but as pass/fail gates, not the headline.
+
+### A. Judgment quality (primary — ranks the candidates)
+
+| Metric | Ground truth | How scored |
 |---|---|---|
-| Citation integrity: kept / (dropped+relocated) | VerificationStats, already instrumented | grounding, anti-fabrication |
-| Schema retry + failure rate | llmjson (add a counter) | reliability of structured output |
-| Reproducibility: score flips across 3 runs | rubric diff, same input | stability writers can trust |
-| Defect discrimination: damaged ≤ clean on target dimension | engineered pairs | actual judgment, pairwise |
-| Honesty on thin signal: withholds vs confabulates | trap scripts | the "insufficient evidence" promise |
-| Synthesis grounding: named characters/events exist in digest | mechanical scan | logline/synopsis faithfulness |
-| Wall time + peak memory per full run | harness timing | practicality per tier |
-| **Human layer:** blind A/B of 3 full reports (operator picks the better read, per section) | Parth | taste — the part arithmetic can't score |
+| Logline fidelity | Produced films have known loglines/spines (Big Fish: a son trying to know his dying father behind the tall tales) | judged: does the model's logline name the actual protagonist, want, and engine — or a generic paraphrase? |
+| Synopsis factual accuracy | The film/script's actual events | count of invented or misattributed events per act |
+| Content rating & budget tier | Actual MPAA rating and production budget of produced films | exact/adjacent-tier match |
+| Comps plausibility | Critical consensus for well-known films | judged: in-genre, in-tone, defensible |
+| Defect discrimination | Engineered pairs (below) — the damaged variant is *known* worse on one dimension | damaged ≤ clean on the target dimension, pairwise |
+| Thin-signal honesty | Trap scripts built to lack signal on specific dimensions | withholds (`insufficient_evidence`) vs confabulates |
+| Rationale quality | Frontier-model judge (public scripts ONLY — never user material; small paid API cost, needs sign-off) | rubric: specificity to this script, consistency with the digest, insight beyond plot summary |
+| Full-report read | Operator blind A/B, 3 scripts | which report would you hand a producer? per-section notes |
+
+**Produced-film ground truth is the workhorse:** scripts of released films give
+free, objective answers for exactly the synthesis judgments where the 8B
+visibly failed (the Big Fish logline missed the story's spine entirely).
+
+### B. Reliability gates (pass/fail, not ranked)
+
+Citation integrity (verifier stats), schema retry/failure rate (<5%),
+score-flip rate across 3 seeds, wall time and peak memory per tier. A model
+failing a gate is out regardless of judgment scores.
 
 ## Harness
 
@@ -62,9 +77,10 @@ is reproducible from the repo.
 
 ## Decision rubric
 
-Disqualify any model that fabricates on thin-signal traps or fails schema
-reliability (>5% unrecoverable). Then rank by defect discrimination and
-citation integrity (equal weight), tie-break on reproducibility, then speed.
+Disqualify on any reliability gate or thin-signal fabrication. Then rank on
+judgment quality: produced-film ground-truth accuracy and defect
+discrimination carry the most weight, rationale-quality judge scores next,
+operator A/B breaks ties. Speed only separates otherwise-equal candidates.
 The worker tier only changes if a candidate's map pass beats llama3.1:8b on
 verbatim notable-line rate at comparable speed.
 
