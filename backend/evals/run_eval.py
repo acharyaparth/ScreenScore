@@ -23,7 +23,7 @@ import statistics
 import time
 from pathlib import Path
 
-from . import metrics
+from . import lf, metrics
 
 
 async def _wait_report(client, report_id: str, timeout: float) -> tuple[dict, list[dict]]:
@@ -61,6 +61,7 @@ async def run_sweep(args) -> Path:
     manifest = json.loads((Path(args.corpus) / "manifest.json").read_text())
 
     pair_tag = f"{args.worker}+{args.reasoning}".replace("/", "_").replace(":", "-")
+    lf_client = lf.get_client()
     rows: list[dict] = []
     reports_by_item_seed: dict[tuple[str, int], dict] = {}
 
@@ -106,6 +107,7 @@ async def run_sweep(args) -> Path:
                 else:
                     record["error"] = (row.get("error") or "")[:300]
                 rows.append(record)
+                lf.log_run(lf_client, pair_tag, record)
                 print(f"[{pair_tag} seed {seed}] {item['id']}: {row['status']} "
                       f"({record['wall_seconds']}s)", flush=True)
 
@@ -117,11 +119,13 @@ async def run_sweep(args) -> Path:
                 clean = reports_by_item_seed.get((item["clean_id"], seed))
                 damaged = reports_by_item_seed.get((item["id"], seed))
                 if clean and damaged:
-                    rows.append({
+                    pair_row = {
                         "item": item["id"], "seed": seed, "kind": "pair_check",
                         "target": item["target_dimension"],
                         "pair": metrics.defect_pair_score(clean, damaged, item["target_dimension"]),
-                    })
+                    }
+                    rows.append(pair_row)
+                    lf.log_run(lf_client, pair_tag, pair_row)
 
         # Reproducibility: flip rate across seeds per item.
         if args.seeds > 1:
@@ -130,7 +134,9 @@ async def run_sweep(args) -> Path:
                            for s in range(args.seeds) if (item["id"], s) in reports_by_item_seed]
                 flip = metrics.score_flip_rate(reports)
                 if flip is not None:
-                    rows.append({"item": item["id"], "kind": "flip_rate", "flip": flip})
+                    flip_row = {"item": item["id"], "kind": "flip_rate", "flip": flip}
+                    rows.append(flip_row)
+                    lf.log_run(lf_client, pair_tag, flip_row)
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -139,6 +145,8 @@ async def run_sweep(args) -> Path:
         "endpoint": args.endpoint or ("fake" if args.fake else "auto"),
         "rows": rows, "summary": summarize(rows),
     }
+    lf.log_summary(lf_client, pair_tag, result["summary"])
+    lf.flush(lf_client)
     out_file = out_dir / f"{pair_tag}.json"
     out_file.write_text(json.dumps(result, indent=2))
     print(json.dumps(result["summary"], indent=2))

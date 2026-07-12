@@ -17,6 +17,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8",
+    "langfuse>=2.50",
     "pytest-asyncio>=0.24",
 ]
 
